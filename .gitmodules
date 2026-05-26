@@ -1,0 +1,3 @@
+[submodule "vendor/fidlib"]
+	path = vendor/fidlib
+	url = https://github.com/JamesHight/fidlib.git
