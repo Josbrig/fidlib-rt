@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2025-2026 Kai Dieki
+#version 450
+/*
+ * fir_dot.comp — FP32 FIR dot-product compute shader.
+ *
+ * One work item per output sample. Computes:
+ *   y[i] = Σ_{k=0}^{M-1} coef[k] * x[i + M - 1 - k]
+ *
+ * Input layout:
+ *   x[0..M-2]   = overlap (last M-1 samples from previous block)
+ *   x[M-1..M+B-2] = B new input samples
+ * Output layout:
+ *   y[0..B-1]   = B convolution results
+ *
+ * Push constants: M (tap count), B (batch size).
+ * Binding 0: coefficient buffer (FP32, M values)
+ * Binding 1: input buffer (FP32, M-1+B values)
+ * Binding 2: output buffer (FP32, B values)
+ */
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform Params {
+    int M;
+    int B;
+} params;
+
+layout(set = 0, binding = 0) readonly  buffer CoefBuf  { float coef[]; };
+layout(set = 0, binding = 1) readonly  buffer InputBuf { float x[]; };
+layout(set = 0, binding = 2) writeonly buffer OutBuf   { float y[]; };
+
+void main() {
+    int i = int(gl_GlobalInvocationID.x);
+    if (i >= params.B) return;
+
+    float sum = 0.0;
+    int base = i + params.M - 1;
+    for (int k = 0; k < params.M; k++) {
+        sum += coef[k] * x[base - k];
+    }
+    y[i] = sum;
+}
