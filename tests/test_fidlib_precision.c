@@ -1,0 +1,199 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Copyright (C) 2025-2026 Kai Dieki
+/*
+ * test_fidlib_precision.c — FP32 vs. FP64 precision comparison
+ *
+ * Verifies that:
+ *   1. FIR filter (boxcar 32-tap) in the current precision mode produces
+ *      correct results (tolerance depends on FID_REAL).
+ *   2. IIR filter (Butterworth LP 4th order) remains stable in the current
+ *      mode and shows plausible attenuation (stability check).
+ *   3. The precision mode is correctly detected and reported.
+ *
+ * FP64 build: tolerance 1e-12 for FIR.
+ * FP32 build: tolerance 1e-5 for FIR (FP32 has ~7 decimal digits).
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include "fidlib.h"
+
+static int g_failed = 0;
+
+static int
+chk_near(const char *lbl, double got, double want, double tol)
+{
+    double err = fabs(got - want);
+    if (err <= tol) {
+        printf("PASS  %-52s  got=%.10g  want=%.10g\n", lbl, got, want);
+        return 0;
+    }
+    fprintf(stderr, "FAIL  %-52s  got=%.10g  want=%.10g  err=%.3e  tol=%.3e\n",
+            lbl, got, want, err, tol);
+    g_failed++;
+    return 1;
+}
+
+static int
+chk_range(const char *lbl, double got, double lo, double hi)
+{
+    if (got >= lo && got <= hi) {
+        printf("PASS  %-52s  got=%.10g  in [%.3g, %.3g]\n", lbl, got, lo, hi);
+        return 0;
+    }
+    fprintf(stderr, "FAIL  %-52s  got=%.10g  expected in [%.3g, %.3g]\n",
+            lbl, got, lo, hi);
+    g_failed++;
+    return 1;
+}
+
+/* ── 1. FIR precision test: 32-tap boxcar ──────────────────────────────── */
+
+static void
+test_fir_precision(void)
+{
+#ifdef FIDLIB_PRECISION_F32
+    const double TOL = 1e-5;   /* FP32: ~7 decimal digits */
+    printf("Mode: FP32 (float)  — tolerance %.0e\n\n", TOL);
+#else
+    const double TOL = 1e-12;  /* FP64: ~15 decimal digits */
+    printf("Mode: FP64 (double) — tolerance %.0e\n\n", TOL);
+#endif
+
+    const int N = 32;
+    const double w = 1.0 / (double)N;
+
+    double arr[N + 3];
+    arr[0] = (double)'F';
+    arr[1] = (double)N;
+    for (int i = 0; i < N; i++) arr[2 + i] = w;
+    arr[2 + N] = 0.0;
+
+    FidFilter *ff = fid_cv_array(arr);
+    FidFunc   *fn = NULL;
+    void      *run = fid_run_new(ff, &fn);
+    void      *buf = fid_run_newbuf(run);
+
+    /* impulse at t=0: expect N outputs of w, then 0 */
+    char label[64];
+    for (int t = 0; t < N; t++) {
+        double in  = (t == 0) ? 1.0 : 0.0;
+        double out = fn(buf, in);
+        snprintf(label, sizeof(label), "boxcar32 impulse t=%d", t);
+        chk_near(label, out, w, TOL);
+    }
+    for (int t = N; t < N + 4; t++) {
+        double out = fn(buf, 0.0);
+        snprintf(label, sizeof(label), "boxcar32 tail    t=%d", t);
+        chk_near(label, out, 0.0, TOL);
+    }
+
+    fid_run_freebuf(buf);
+    fid_run_free(run);
+    free(ff);
+}
+
+/* ── 2. IIR stability test: Butterworth LP 4th order ───────────────────── */
+
+static void
+test_iir_stability(void)
+{
+    /* LpBu4 at 1000 Hz, sample rate 44100 Hz */
+    FidFilter *ff  = fid_design("LpBu4/1000", 44100.0, -1.0, -1.0, 0, NULL);
+    FidFunc   *fn  = NULL;
+    void      *run = fid_run_new(ff, &fn);
+    void      *buf = fid_run_newbuf(run);
+
+    /* impulse response: 2000 samples; finite energy, no divergence */
+    double energy   = 0.0;
+    double peak_late = 0.0;   /* max |out| nach Sample 500 */
+    int    exploded  = 0;
+    for (int t = 0; t < 2000; t++) {
+        double in  = (t == 0) ? 1.0 : 0.0;
+        double out = fn(buf, in);
+        energy += out * out;
+        if (t > 500) peak_late = fmax(peak_late, fabs(out));
+        if (fabs(out) > 1e6) { exploded = 1; break; }
+    }
+
+    chk_range("LpBu4 impulse energy",    energy,    1e-10, 1e4);
+    chk_range("LpBu4 late-stage decay",  peak_late, 0.0,   1e-4);
+
+    if (!exploded)
+        printf("PASS  %-52s  no divergence\n", "LpBu4 no explosion");
+    else {
+        fprintf(stderr, "FAIL  %-52s  output diverged (|out| > 1e6)\n", "LpBu4 no explosion");
+        g_failed++;
+    }
+
+    fid_run_freebuf(buf);
+    fid_run_free(run);
+    free(ff);
+}
+
+/* ── 3. Passband test: DC and Nyquist ───────────────────────────────────── */
+
+static void
+test_fir_dc_nyquist(void)
+{
+#ifdef FIDLIB_PRECISION_F32
+    const double TOL = 5e-5;
+#else
+    const double TOL = 1e-10;
+#endif
+
+    /* 16-tap boxcar: DC gain = 1, Nyquist gain = 0 for even N */
+    const int N = 16;
+    const double w = 1.0 / (double)N;
+
+    double arr[N + 3];
+    arr[0] = (double)'F';
+    arr[1] = (double)N;
+    for (int i = 0; i < N; i++) arr[2 + i] = w;
+    arr[2 + N] = 0.0;
+
+    FidFilter *ff  = fid_cv_array(arr);
+    FidFunc   *fn  = NULL;
+    void      *run = fid_run_new(ff, &fn);
+    void      *buf = fid_run_newbuf(run);
+
+    /* DC: feed 200 samples with in=1.0, last output should be 1.0 */
+    double dc_out = 0.0;
+    for (int t = 0; t < 200; t++) dc_out = fn(buf, 1.0);
+    chk_near("boxcar16 DC gain", dc_out, 1.0, TOL);
+
+    /* Nyquist (alternating +1/-1): output should be ~0 */
+    fid_run_zapbuf(buf);
+    double nyq_out = 0.0;
+    for (int t = 0; t < 200; t++) nyq_out = fn(buf, (t % 2 == 0) ? 1.0 : -1.0);
+    chk_near("boxcar16 Nyquist attenuation", nyq_out, 0.0, TOL);
+
+    fid_run_freebuf(buf);
+    fid_run_free(run);
+    free(ff);
+}
+
+/* ── main ────────────────────────────────────────────────────────────────── */
+
+int main(void)
+{
+    printf("=== FIR precision test (32-tap boxcar) ===\n");
+    test_fir_precision();
+    printf("\n");
+
+    printf("=== IIR stability test (LpBu4) ===\n");
+    test_iir_stability();
+    printf("\n");
+
+    printf("=== FIR DC/Nyquist test (16-tap boxcar) ===\n");
+    test_fir_dc_nyquist();
+    printf("\n");
+
+    if (g_failed == 0)
+        printf("ALL TESTS PASSED\n");
+    else
+        fprintf(stderr, "%d TEST(S) FAILED\n", g_failed);
+
+    return g_failed ? 1 : 0;
+}
