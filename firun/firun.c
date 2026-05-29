@@ -188,7 +188,7 @@ static char *
 decode_spec(const char *spec, int in) {
    const char *p;
    int len= 0;
-   char *rv, *sp;
+   char *rv = NULL, *sp = NULL;
    int pass;
 
    // Check for specials

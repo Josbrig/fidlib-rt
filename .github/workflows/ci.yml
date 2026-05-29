@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2025-2026 Kai Dieki
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Debug · ASan/UBSan · SSE2"
+            build_type: Debug
+            cmake_flags: >-
+              -DBUILD_FIVIEW=OFF
+              -DFIDLIB_FFT=ON
+              -DFIDLIB_SIMD=ON
+
+          - name: "Release · SSE2"
+            build_type: Release
+            cmake_flags: >-
+              -DBUILD_FIVIEW=OFF
+              -DFIDLIB_FFT=ON
+              -DFIDLIB_SIMD=ON
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libfftw3-dev
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: build-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt', 'fidlib/CMakeLists.txt', 'firun/CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          restore-keys: |
+            build-${{ matrix.build_type }}-
+
+      - name: Configure
+        run: |
+          cmake -G "Unix Makefiles" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            ${{ matrix.cmake_flags }} \
+            -S . -B build
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=0

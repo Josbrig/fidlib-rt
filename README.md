@@ -1,5 +1,9 @@
 # Digital Filter Design — Modernisation Project
 
+[![CI](https://github.com/Josbrig/fidlib-rt/actions/workflows/ci.yml/badge.svg)](https://github.com/Josbrig/fidlib-rt/actions/workflows/ci.yml)
+[![License: LGPL v2.1](https://img.shields.io/badge/Library-LGPL--2.1-blue.svg)](COPYING_LIB)
+[![License: GPL v2](https://img.shields.io/badge/Tools-GPL--2.0-blue.svg)](COPYING)
+
 C library + CLI toolkit for runtime-flexible IIR/FIR filter design,
 based on fidlib/fiview (Jim Peters, uazu.net).
 
