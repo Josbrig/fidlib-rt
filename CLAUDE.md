@@ -223,6 +223,90 @@ git merge --continue
 
 ---
 
+## I — Pre-commit build gate (MANDATORY)
+
+**A commit is only allowed after both a Release build and a Debug build pass locally.**
+For `develop`, `main`, and any GitHub push this is absolute — no exceptions.
+
+### Why this rule exists
+
+The local compiler (RPi 5: GCC 12) and the CI compiler (ubuntu-latest: GCC 13) differ.
+More importantly, `-O0` (Debug) suppresses entire warning classes that `-O2` (Release)
+makes visible via optimiser-driven control-flow analysis. In this project we learned this
+the hard way: a `char *rv, *sp;` declaration slipped through Debug cleanly but caused
+`-Wmaybe-uninitialized` hard errors on CI twice in a row, requiring two extra fix commits
+on a public repository.
+
+Warning classes that appear **only** in Release (`-O2`) but not Debug (`-O0`):
+
+| Warning | Root cause |
+|---------|-----------|
+| `-Wmaybe-uninitialized` | Optimiser finds code paths where a variable has no assigned value |
+| `-Wformat-truncation` | `snprintf`/`vsnprintf` with format pointer not proven non-NULL |
+| `-Wstringop-overflow` | String ops with statically-knowable buffer boundaries |
+| `-Warray-bounds` | Array accesses the optimiser can prove are out-of-bounds |
+
+All of these become hard errors via `-Werror`. The Debug build stays green while the
+Release build aborts — and CI always runs Release.
+
+### Mandatory sequence before committing to develop / main / GitHub
+
+```bash
+# Step 1 — Release build (separate directory to avoid cached Debug artefacts)
+cmake -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_FIVIEW=OFF \
+  -DFIDLIB_FFT=ON \
+  -DFIDLIB_SIMD=ON \
+  -S . -B build_release
+
+cmake --build build_release -j$(nproc)
+ctest --test-dir build_release --output-on-failure
+
+# Step 2 — Debug build with sanitisers
+cmake -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_FIVIEW=OFF \
+  -DFIDLIB_FFT=ON \
+  -DFIDLIB_SIMD=ON \
+  -S . -B build
+
+cmake --build build -j$(nproc)
+ASAN_OPTIONS=detect_leaks=0 ctest --test-dir build --output-on-failure
+
+# Step 3 — Only now: await explicit commit instruction from user
+```
+
+> Use **separate** directories (`build/` for Debug, `build_release/` for Release).
+> Re-configuring a single directory changes the type but leaves cached object files
+> from the previous type that can mask new errors.
+
+### Escalation levels
+
+| Branch | Release + ctest | Debug + ctest |
+|--------|----------------|--------------|
+| `feature/*` | recommended | recommended |
+| `develop` | **mandatory** | **mandatory** |
+| `main` | **mandatory** | **mandatory** |
+| GitHub push | **mandatory** | **mandatory** |
+
+### Fixing Release-only warnings
+
+The correct fix for `-Wmaybe-uninitialized` is almost always an initialisation that is
+also semantically correct:
+
+```c
+char *rv = NULL, *sp = NULL;   // not just rv — both on the same declaration line
+double out[2] = {0.0, 0.0};    // not just declared — initialised
+int max_resp_cnt = 0;           // correct default if no sample exceeds threshold
+char *prev = txt;               // semantically: start of first line if no \n found
+```
+
+These are real bug fixes, not compiler-silencing hacks: an uninitialised variable that
+happens to hold the right value at runtime is a latent bug.
+
+---
+
 ## Quick reference
 
 | What | Where |
