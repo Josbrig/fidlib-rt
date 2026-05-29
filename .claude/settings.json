@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/jos/Projects/digitalfilterdesign submodule update --init)",
+      "Bash(git -C /home/jos/Projects/digitalfilterdesign submodule status)",
+      "Bash(tar -tzf gmeteor/gmeteor-0.95.tar.gz)",
+      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && head -30 {}')"
+    ]
+  }
+}
