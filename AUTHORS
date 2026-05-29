@@ -1,0 +1,27 @@
+Authors and Contributors
+========================
+
+Jim Peters <jim@uazu.net>
+  Original author of fidlib, fiview, and firun (2002–2004).
+  Brighton, UK. http://uazu.net/
+
+JamesHight
+  Community patches to fidlib: const-correctness, C++ guards, v0.9.11.
+  https://github.com/JamesHight/fidlib
+
+Kai Dieki
+  Extensions: SIMD/NEON acceleration, Overlap-Save FFT engine,
+  Vulkan Compute backend, OpenCL backend, cmake modernization,
+  install scripts, manuals (2025–2026).
+
+Acknowledgements
+----------------
+
+Dr. Tony Fisher (1956–2000), University of York, UK
+  Author of mkfilter. The filter design algorithms in fidlib are based
+  on techniques from his work, with permission from the University of York.
+  http://www-users.cs.york.ac.uk/~fisher/mkfilter/
+
+Robert Bristow-Johnson
+  Author of the Audio EQ Cookbook, whose biquad filter formulas
+  are implemented in fidlib's BpBq/LpBq/etc. filter family.

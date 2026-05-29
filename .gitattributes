@@ -1,0 +1,4 @@
+# merge=union: both sides are united — lines never disappear silently
+# Suitable for purely additive files (TODO, CHANGELOG). Duplicates are visible.
+TODO.md      merge=union
+CHANGELOG.md merge=union
