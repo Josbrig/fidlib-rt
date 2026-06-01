@@ -70,8 +70,8 @@ std::string FilterState::build_spec(const FilterParams& p)
         p.family == FilterFamily::FIR_Blackman || p.family == FilterFamily::FIR_Bartlett) {
         s << pb << fam << "/" << fmt_freq(p.fc1);
     } else if (p.family == FilterFamily::PeakingEQ) {
-        s << pb << fam << p.order << "/" << fmt_freq(p.fc1)
-          << "/" << p.q_factor << "/" << p.gain_db;
+        s << pb << fam << p.order << "/" << p.q_factor
+          << "/" << p.gain_db << "/" << fmt_freq(p.fc1);
     } else if (p.family == FilterFamily::AllpassBiquad) {
         s << pb << fam << p.order << "/" << p.q_factor << "/" << fmt_freq(p.fc1);
     } else if (p.family == FilterFamily::BandpassResonator) {

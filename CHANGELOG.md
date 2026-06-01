@@ -5,6 +5,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) — [SemVer](ht
 
 ---
 
+## [0.1.2] — 2026-06-01
+
+### Added
+
+**fiview2 — WebAssembly browser port** (`web/`)
+- Single-file HTML application (`fiview2.html`) — no server, no installation, works offline
+- All 10 filter families, all 4 passbands, all fidlib spec types
+- Canvas 2D plots: Frequency Response (log X, dB Y, phase overlay), Impulse/Step Response
+  (time axis in ms/s), Poles/Zeros (unit circle, hover tooltip)
+- Scroll-wheel zoom + drag-pan + double-click reset on Frequency Response and Impulse plots
+- A/B/C/D comparison: freeze up to 4 filter designs; overlaid in all plots
+- Stability panel: STABLE/UNSTABLE indicator, pole magnitude bar, FP32 warning at order ≥ 8,
+  Order −2 button for unstable filters
+- Guided Mode wizard (2-step dialog: use case + problem → sensible filter preset)
+- Filter Cascade tab: SOS coefficient table (b0/b1/b2/a1/a2 per stage)
+- Export tab: code generation in all 8 languages; Copy + Download buttons;
+  textarea fills available panel height
+- Persistent state: `localStorage` auto-save/load, JSON file export/import, URL hash sharing
+- `web/bundle.py`: packages HTML + WASM as a single self-contained offline file (~600 KB)
+- `dist-deploy/`: pre-built WASM artifacts for local development without Emscripten
+
+### Fixed
+
+**fiview2 (desktop + web)**
+- `PkBq` (Peaking EQ) spec parameter order was wrong: was `<freq>/<Q>/<gain>`,
+  must be `<Q>/<gain>/<freq>` — filter produced incorrect results in both versions
+- FIR Hann and Hamming filter names were swapped (key `Hm` = Hamming, `Hn` = Hann)
+
+**fiview2 web**
+- Parameter panel vanished when selecting any FIR or special filter type
+  (`passband.parentElement` was `panel-body`; fixed with explicit `#passband-row` wrapper)
+- FIR spec included a tap count that fidlib does not accept (`LpHm100/fc` → `LpHm/fc`);
+  fidlib windowed FIR filters determine tap count from the cutoff frequency automatically
+- Order slider and Passband selector are now correctly hidden for FIR filters
+  (fidlib only supports LP variants for windowed FIR; no user-settable tap count)
+
+---
+
 ## [0.1.1] — 2026-06-01
 
 ### Added
@@ -96,5 +134,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) — [SemVer](ht
 - FIDLIB_VULKAN=ON requires Vulkan SDK headers (Apache-2.0); incompatible with GPL-2.0-only
   targets (`fiview`, `firun`) — see `doc/github-strict-ruleset.md §1.3`
 
+[0.1.2]: https://github.com/Josbrig/fidlib-rt/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Josbrig/fidlib-rt/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Josbrig/fidlib-rt/releases/tag/v0.1.0

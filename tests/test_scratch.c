@@ -1,8 +1,8 @@
 /*
  * test_scratch.c — unit tests for fiview/src/scratch.c
  *
- * Jede Funktion/Macro wird in Isolation getestet.
- * stubs.c liefert error() (longjmp-basiert) und die Globals.
+ * Each function/macro is tested in isolation.
+ * stubs.c provides error() (longjmp-based) and the globals.
  */
 
 #include "test_all.h"

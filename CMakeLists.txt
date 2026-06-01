@@ -29,6 +29,7 @@ option(BUILD_FIVIEW      "Build fiview visualizer (legacy SDL, linker issue open
 option(BUILD_FIDGEN      "Build fidgen code generator"                              ON)
 option(BUILD_FIVIEW2     "Build fiview2 filter workbench"                           ON)
 option(BUILD_TESTS       "Build tests"                                              ON)
+option(BUILD_WEB         "Build Emscripten WASM module (requires Emscripten)"       OFF)
 option(ENABLE_SANITIZERS "Enable ASan + UBSan"                                     OFF)
 option(CXX20_COMPAT      "Compile all components with C++20"                        ON)
 
@@ -119,4 +120,8 @@ endif()
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
+endif()
+
+if(BUILD_WEB)
+  add_subdirectory(web)
 endif()

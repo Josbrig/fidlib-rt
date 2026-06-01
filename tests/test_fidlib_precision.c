@@ -5,8 +5,8 @@
  *
  * Checks that:
  *   1. FIR filter (32-tap Boxcar) in current precision mode produces correct
- *      Ergebnisse liefert (Toleranz je nach FID_REAL).
- *   2. IIR-Filter (Butterworth LP 4. Ordnung) im aktuellen Modus stabil
+ *      results (tolerance depending on FID_REAL).
+ *   2. IIR filter (Butterworth LP 4th order) in current precision mode
  *      remains stable and shows plausible attenuation (stability check).
  *   3. The precision mode is correctly detected and reported.
  *
@@ -75,7 +75,7 @@ test_fir_precision(void)
     void      *run = fid_run_new(ff, &fn);
     void      *buf = fid_run_newbuf(run);
 
-    /* Impuls bei t=0: erwarte N Ausgaben von w, dann 0 */
+    /* Impulse at t=0: expect N outputs of w, then 0 */
     char label[64];
     for (int t = 0; t < N; t++) {
         double in  = (t == 0) ? 1.0 : 0.0;
@@ -99,15 +99,15 @@ test_fir_precision(void)
 static void
 test_iir_stability(void)
 {
-    /* LpBu4 bei 1000 Hz, Abtastrate 44100 Hz */
+    /* LpBu4 at 1000 Hz, sample rate 44100 Hz */
     FidFilter *ff  = fid_design("LpBu4/1000", 44100.0, -1.0, -1.0, 0, NULL);
     FidFunc   *fn  = NULL;
     void      *run = fid_run_new(ff, &fn);
     void      *buf = fid_run_newbuf(run);
 
-    /* Impulsantwort: 2000 Samples; Energie endlich, kein Divergenz */
+    /* Impulse response: 2000 samples; finite energy, no divergence */
     double energy   = 0.0;
-    double peak_late = 0.0;   /* max |out| nach Sample 500 */
+    double peak_late = 0.0;   /* max |out| after sample 500 */
     int    exploded  = 0;
     for (int t = 0; t < 2000; t++) {
         double in  = (t == 0) ? 1.0 : 0.0;
@@ -132,7 +132,7 @@ test_iir_stability(void)
     free(ff);
 }
 
-/* ── 3. Sinus-Durchlasstest: DC und Nyquist ─────────────────────────────── */
+/* ── 3. Sine passband test: DC and Nyquist ──────────────────────────────── */
 
 static void
 test_fir_dc_nyquist(void)
@@ -158,7 +158,7 @@ test_fir_dc_nyquist(void)
     void      *run = fid_run_new(ff, &fn);
     void      *buf = fid_run_newbuf(run);
 
-    /* DC: pumpe 200 Samples mit in=1.0, letzter Output soll 1.0 sein */
+    /* DC: pump 200 samples with in=1.0, last output must be 1.0 */
     double dc_out = 0.0;
     for (int t = 0; t < 200; t++) dc_out = fn(buf, 1.0);
     chk_near("boxcar16 DC gain", dc_out, 1.0, TOL);

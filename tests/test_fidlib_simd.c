@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (C) 2025-2026 Jörg Simbrig
 /*
- * test_fidlib_simd.c — Korrektheit der SIMD-Beschleunigung (NEON/SSE2)
+ * test_fidlib_simd.c — Correctness of SIMD acceleration (NEON/SSE2)
  *
- * Testet:
- *   1. fid_fir_dot() direkt gegen skalare Referenzimplementierung
+ * Tests:
+ *   1. fid_fir_dot() directly against scalar reference implementation
  *      (only when FIDLIB_SIMD is defined, otherwise skipped)
- *   2. 16-Tap Boxcar-FIR mit Impulsantwort — Ende-zu-Ende
+ *   2. 16-tap Boxcar FIR with impulse response — end-to-end
  *      (always runs; triggers opcode 8 in the command-list backend)
  */
 
@@ -39,7 +39,7 @@ chk_near(const char *lbl, double got, double want, double tol)
     return 1;
 }
 
-/* ── 1. fid_fir_dot direkter Primitiv-Test ─────────────────────────────── */
+/* ── 1. fid_fir_dot direct primitive test ──────────────────────────────── */
 
 #ifdef FIDLIB_SIMD
 static void
@@ -74,13 +74,13 @@ test_fir_dot_primitive(void)
 }
 #endif /* FIDLIB_SIMD */
 
-/* ── 2. Boxcar-FIR Impulsantwort ──────────────────────────────────────── */
+/* ── 2. Boxcar-FIR impulse response ───────────────────────────────────── */
 
 static void
 test_boxcar_impulse(void)
 {
-    /* 16-Tap Boxcar: alle Koeffizienten = 1/16
-     * Impulsantwort: 16 Ausgaben je 1/16, dann Null. */
+    /* 16-tap Boxcar: all coefficients = 1/16
+     * Impulse response: 16 outputs of 1/16 each, then zero. */
     const double w = 1.0 / (double)N_TAPS;
 
     /* array format for fid_cv_array: type, len, val[0..len-1], 0 */
@@ -96,7 +96,7 @@ test_boxcar_impulse(void)
     void    *run = fid_run_new(ff, &fn);
     void    *buf = fid_run_newbuf(run);
 
-    /* Impuls bei t=0 */
+    /* impulse at t=0 */
     char label[64];
     for (int t = 0; t < N_TAPS; t++) {
         double in  = (t == 0) ? 1.0 : 0.0;
@@ -184,11 +184,11 @@ int main(void)
     printf("(FIDLIB_SIMD not active — primitive test skipped)\n\n");
 #endif
 
-    printf("=== Boxcar-FIR Impulsantwort (opcode-8 Pfad) ===\n");
+    printf("=== Boxcar-FIR impulse response (opcode-8 path) ===\n");
     test_boxcar_impulse();
     printf("\n");
 
-    printf("=== Boxcar-FIR mit fid_run_initbuf / fid_run_zapbuf ===\n");
+    printf("=== Boxcar-FIR with fid_run_initbuf / fid_run_zapbuf ===\n");
     test_boxcar_initbuf();
     printf("\n");
 

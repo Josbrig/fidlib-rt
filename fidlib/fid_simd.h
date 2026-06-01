@@ -2,9 +2,9 @@
 // Copyright (C) 2025-2026 Jörg Simbrig
 /**
  * @file fid_simd.h
- * @brief SIMD-Erkennung und vektorisiertes FIR-Dotprodukt (NEON / SSE2 / Skalar).
+ * @brief SIMD detection and vectorised FIR dot product (NEON / SSE2 / scalar).
  *
- * Wird von fidrf_cmdlist.h eingebunden, wenn FIDLIB_SIMD definiert ist.
+ * Included by fidrf_cmdlist.h when FIDLIB_SIMD is defined.
  * Platform detection is performed at compile time via preprocessor macros.
  *
  * @ingroup fidlib_run
@@ -24,14 +24,14 @@
 /**
  * @brief Vectorised FIR dot product: Σ coef[i]·data[i] for i = 0…n-1.
  *
- * Auf AArch64 mit NEON: doppelt akkumulierende vfmaq_f64-Schleife (4-wide
- * unrolling). Auf x86_64 mit SSE2: _mm_mul_pd/_mm_add_pd (4-wide unrolling).
- * Fallback: skalares C. n ≥ 1 wird vorausgesetzt.
+ * On AArch64 with NEON: dual-accumulating vfmaq_f64 loop (4-wide unrolling).
+ * On x86_64 with SSE2: _mm_mul_pd/_mm_add_pd (4-wide unrolling).
+ * Fallback: scalar C. n ≥ 1 is required.
  *
- * @param coef  Zeiger auf n Koeffizienten (keine Ausrichtungsanforderung).
- * @param data  Zeiger auf n Datenwerte   (keine Ausrichtungsanforderung).
- * @param n     Anzahl der Elemente (≥ 1).
- * @return      Skalarprodukt als double.
+ * @param coef  Pointer to n coefficients (no alignment requirement).
+ * @param data  Pointer to n data values  (no alignment requirement).
+ * @param n     Number of elements (≥ 1).
+ * @return      Dot product as double.
  * @rtSafe
  * @ingroup fidlib_run
  */
