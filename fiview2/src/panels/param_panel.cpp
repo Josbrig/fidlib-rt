@@ -65,7 +65,13 @@ void draw_param_panel(FilterState& state)
         bool sel = (std::fabs(p.rate - k_rates[i]) < 1.0);
         if (sel) ImGui::PushStyleColor(ImGuiCol_Button,
                      ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::SmallButton(k_rate_labels[i])) { p.rate = k_rates[i]; changed = true; }
+        if (ImGui::SmallButton(k_rate_labels[i])) {
+                p.rate = k_rates[i];
+                double new_nyq = p.rate * 0.5;
+                p.fc1 = std::clamp(p.fc1, 1.0, new_nyq - 1.0);
+                p.fc2 = std::clamp(p.fc2, p.fc1 + 0.01, new_nyq - 1.0);
+                changed = true;
+            }
         if (sel) ImGui::PopStyleColor();
     }
     {
@@ -74,6 +80,9 @@ void draw_param_panel(FilterState& state)
         ImGui::InputDouble("##rate", &r, 0, 0, "%.2f Hz");
         if (ImGui::IsItemDeactivatedAfterEdit()) {
             p.rate = std::clamp(r, 100.0, 384000.0);
+            double new_nyq = p.rate * 0.5;
+            p.fc1 = std::clamp(p.fc1, 1.0, new_nyq - 1.0);
+            p.fc2 = std::clamp(p.fc2, p.fc1 + 0.01, new_nyq - 1.0);
             changed = true;
         }
     }
@@ -106,16 +115,17 @@ void draw_param_panel(FilterState& state)
         float avail = ImGui::GetContentRegionAvail().x;
         float input_w = 40.0f;
         float slider_w = std::max(60.0f, avail - input_w - 6.0f);
+        int max_order = (p.family == FilterFamily::Bessel) ? 10 : 20;
         int ord = p.order;
         ImGui::SetNextItemWidth(slider_w);
-        if (ImGui::SliderInt("##order", &ord, 1, 20)) {
+        if (ImGui::SliderInt("##order", &ord, 1, max_order)) {
             p.order = ord; changed = true;
         }
         ImGui::SameLine(0, 4);
         ImGui::SetNextItemWidth(input_w);
         ImGui::InputInt("##ordi", &ord, 0, 0);
         if (ImGui::IsItemDeactivatedAfterEdit()) {
-            p.order = std::clamp(ord, 1, 20); changed = true;
+            p.order = std::clamp(ord, 1, max_order); changed = true;
         }
     }
 
@@ -139,6 +149,8 @@ void draw_param_panel(FilterState& state)
         if (param_double("fc1", fc1_label, fc, 1.0, nyq - 1.0,
                          "%.1f", "%.4f", true)) {
             p.fc1 = std::clamp(fc, 1.0, nyq - 1.0);
+            if (bp_or_bs)
+                p.fc2 = std::max(p.fc2, p.fc1 + 1.0);  // keep fc2 above fc1
             changed = true;
         }
     }

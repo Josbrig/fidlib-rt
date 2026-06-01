@@ -120,6 +120,26 @@ void FilterState::recompute_slot(FilterSlot& slot)
                  ? raw_spec_ : build_spec(p);
 
     // ── design filter ──────────────────────────────────────────────────────
+    const double nyq = p.rate * 0.5;
+    if (p.fc1 <= 0.0 || p.fc1 >= nyq) {
+        r.error_msg = "fc1 out of range (0, Nyquist)";
+        return;
+    }
+    if (p.family == FilterFamily::Bessel && p.order > 10) {
+        r.error_msg = "Bessel maximum order is 10";
+        return;
+    }
+    bool bp_or_bs = (p.passband == FilterPassband::BP ||
+                     p.passband == FilterPassband::BS);
+    if (bp_or_bs && p.fc2 <= p.fc1 + 0.01) {
+        r.error_msg = "fc2 must be above fc1";
+        return;
+    }
+    if (bp_or_bs && p.fc2 >= nyq) {
+        r.error_msg = "fc2 above Nyquist";
+        return;
+    }
+
     FidFilter* ff_raw = fid_design(r.spec_str.c_str(), p.rate,
                                    -1.0, -1.0, 0, nullptr);
     if (!ff_raw) {
@@ -129,7 +149,6 @@ void FilterState::recompute_slot(FilterSlot& slot)
     r.ff = {ff_raw, [](FidFilter* fp){ std::free(fp); }};
 
     // ── frequency response ─────────────────────────────────────────────────
-    const double nyq = p.rate * 0.5;
     r.freq_response.reserve(N_FREQ);
 
     for (int k = 0; k < N_FREQ; ++k) {
@@ -195,18 +214,29 @@ void FilterState::recompute_slot(FilterSlot& slot)
     {
         double (*step_fn)(void*, double) = nullptr;
         void* run = fid_run_new(ff_raw, &step_fn);
+        if (!run) {
+            r.error_msg = "fid_run_new failed";
+            return;
+        }
         void* buf = fid_run_newbuf(run);
 
         r.impulse.resize(N_RESP);
         r.step.resize(N_RESP);
         double x = 1.0;
         double acc = 0.0;
+        bool unstable = false;
         for (int i = 0; i < N_RESP; ++i) {
             double y = step_fn(buf, x);
+            if (!std::isfinite(y)) { unstable = true; break; }
             r.impulse[static_cast<size_t>(i)] = y;
             acc += y;
             r.step[static_cast<size_t>(i)] = acc;
             x = 0.0;
+        }
+        if (unstable) {
+            r.impulse.clear();
+            r.step.clear();
+            r.error_msg = "unstable filter (impulse response diverges)";
         }
 
         fid_run_freebuf(buf);

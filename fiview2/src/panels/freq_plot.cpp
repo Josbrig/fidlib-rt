@@ -145,6 +145,10 @@ static void draw_curve(ImDrawList* dl, ImVec2 p0, float w, float h,
     }
 }
 
+// Persistent zoom state for the frequency plot
+static double s_f_lo = 1.0;
+static double s_f_hi = 0.0;   // 0 = uninitialised → reset on first draw
+
 void draw_freq_plot(FilterState& state)
 {
     if (!ImGui::Begin("Frequency Response")) { ImGui::End(); return; }
@@ -158,6 +162,8 @@ void draw_freq_plot(FilterState& state)
     ImGui::SameLine(); ImGui::Checkbox("Cascade",    &show_cascade);
     ImGui::SameLine(); ImGui::Checkbox("Individual", &show_slots);
     ImGui::SameLine(); ImGui::Checkbox("Auto Y",     &auto_scale);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Reset Zoom")) s_f_hi = 0.0;
 
     // Spec
     const auto& res = state.result();
@@ -172,8 +178,16 @@ void draw_freq_plot(FilterState& state)
     ImVec2 p0 = ImGui::GetCursorScreenPos();
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    const double f_lo = 1.0;
-    const double f_hi = state.nyquist();
+    const double nyq = state.nyquist();
+
+    // Initialise or clamp zoom state
+    if (s_f_hi <= s_f_lo || s_f_hi > nyq * 1.01)
+        { s_f_lo = 1.0; s_f_hi = nyq; }
+    s_f_lo = std::max(s_f_lo, 1.0);
+    s_f_hi = std::min(s_f_hi, nyq);
+
+    double f_lo = s_f_lo;
+    double f_hi = s_f_hi;
 
     // ── determine dB range ──────────────────────────────────────────────────
     double db_min =  std::numeric_limits<double>::infinity();
@@ -230,13 +244,55 @@ void draw_freq_plot(FilterState& state)
                    f_lo, f_hi, db_min, db_max,
                    IM_COL32(255,255,255,230), show_phase);
 
-    // ── crosshair and tooltip ──────────────────────────────────────────────
+    // ── interaction: zoom / pan / tooltip ─────────────────────────────────
     ImGui::InvisibleButton("##plot", {w, h});
-    if (ImGui::IsItemHovered()) {
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active  = ImGui::IsItemActive();
+
+    if (hovered || active) {
         ImVec2 mp = ImGui::GetMousePos();
         float  tx = std::clamp((mp.x - p0.x) / w, 0.0f, 1.0f);
-        double freq = math::log_denormalize(tx, f_lo, f_hi);
+        double freq_at_cursor = math::log_denormalize(tx, f_lo, f_hi);
 
+        // ── scroll zoom (log space, centred on cursor) ──────────────────
+        float scroll = ImGui::GetIO().MouseWheel;
+        if (hovered && scroll != 0.0f) {
+            double factor = (scroll > 0.0f) ? 1.0 / 1.35 : 1.35;
+            double log_lo = std::log(f_lo), log_hi = std::log(f_hi);
+            double log_cur = std::log(freq_at_cursor);
+            double new_lo = std::exp(log_cur + (log_lo - log_cur) * factor);
+            double new_hi = std::exp(log_cur + (log_hi - log_cur) * factor);
+            // Clamp to [1, nyquist], keep at least one decade visible
+            new_lo = std::max(new_lo, 1.0);
+            new_hi = std::min(new_hi, nyq);
+            if (std::log(new_hi) - std::log(new_lo) >= std::log(4.0)) {
+                s_f_lo = new_lo; s_f_hi = new_hi;
+                f_lo = s_f_lo;  f_hi = s_f_hi;
+            }
+        }
+
+        // ── drag pan ────────────────────────────────────────────────────
+        if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f)) {
+            float dx = ImGui::GetIO().MouseDelta.x;
+            if (dx != 0.0f) {
+                double log_lo  = std::log(f_lo), log_hi = std::log(f_hi);
+                double log_range = log_hi - log_lo;
+                double shift = -(static_cast<double>(dx) / static_cast<double>(w)) * log_range;
+                double new_lo = std::exp(log_lo + shift);
+                double new_hi = std::exp(log_hi + shift);
+                if (new_lo >= 1.0 && new_hi <= nyq)
+                    { s_f_lo = new_lo; s_f_hi = new_hi;
+                      f_lo = s_f_lo;   f_hi = s_f_hi; }
+            }
+        }
+
+        // ── double-click reset ──────────────────────────────────────────
+        if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            { s_f_lo = 1.0; s_f_hi = nyq; f_lo = s_f_lo; f_hi = s_f_hi; }
+
+        // ── crosshair + tooltip ─────────────────────────────────────────
+        float tx2 = std::clamp((mp.x - p0.x) / w, 0.0f, 1.0f);
+        double freq = math::log_denormalize(tx2, f_lo, f_hi);
         dl->AddLine({mp.x, p0.y}, {mp.x, p0.y+h}, IM_COL32(255,255,100,100));
 
         ImGui::BeginTooltip();
@@ -247,7 +303,7 @@ void draw_freq_plot(FilterState& state)
             size_t lo_i = 0, hi_i = fr.size() - 1;
             while (lo_i < hi_i) {
                 size_t mid = (lo_i + hi_i) / 2;
-                if (math::log_normalize(fr[mid].freq_hz, f_lo, f_hi) < tx)
+                if (math::log_normalize(fr[mid].freq_hz, f_lo, f_hi) < tx2)
                     lo_i = mid + 1;
                 else hi_i = mid;
             }
