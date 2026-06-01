@@ -2,9 +2,9 @@
 // Copyright (C) 2025-2026 Jörg Simbrig
 /**
  * @file fid_simd.h
- * @brief SIMD-Erkennung und vektorisiertes FIR-Dotprodukt (NEON / SSE2 / Skalar).
+ * @brief SIMD detection and vectorised FIR dot product (NEON / SSE2 / scalar).
  *
- * Wird von fidrf_cmdlist.h eingebunden, wenn FIDLIB_SIMD definiert ist.
+ * Included by fidrf_cmdlist.h when FIDLIB_SIMD is defined.
  * Platform detection is performed at compile time via preprocessor macros.
  *
  * @ingroup fidlib_run
@@ -24,14 +24,14 @@
 /**
  * @brief Vectorised FIR dot product: Σ coef[i]·data[i] for i = 0…n-1.
  *
- * Auf AArch64 mit NEON: doppelt akkumulierende vfmaq_f64-Schleife (4-wide
- * unrolling). Auf x86_64 mit SSE2: _mm_mul_pd/_mm_add_pd (4-wide unrolling).
- * Fallback: skalares C. n ≥ 1 wird vorausgesetzt.
+ * On AArch64 with NEON: dual-accumulating vfmaq_f64 loop (4-wide unrolling).
+ * On x86_64 with SSE2: _mm_mul_pd/_mm_add_pd (4-wide unrolling).
+ * Fallback: scalar C. n ≥ 1 is required.
  *
- * @param coef  Zeiger auf n Koeffizienten (keine Ausrichtungsanforderung).
- * @param data  Zeiger auf n Datenwerte   (keine Ausrichtungsanforderung).
- * @param n     Anzahl der Elemente (≥ 1).
- * @return      Skalarprodukt als double.
+ * @param coef  Pointer to n coefficients (no alignment requirement).
+ * @param data  Pointer to n data values  (no alignment requirement).
+ * @param n     Number of elements (≥ 1).
+ * @return      Dot product as double.
  * @rtSafe
  * @ingroup fidlib_run
  */
@@ -78,7 +78,7 @@ fid_fir_dot(const double *coef, const double *data, int n)
         return r;
     }
 
-#else  /* skalarer Fallback */
+#else  /* scalar fallback */
     double r = 0.0;
     int i;
     for (i = 0; i < n; i++) r += coef[i] * data[i];
@@ -89,9 +89,9 @@ fid_fir_dot(const double *coef, const double *data, int n)
 /**
  * @brief Vectorised FIR dot product (FP32): Σ coef[i]·data[i] for i = 0…n-1.
  *
- * Auf AArch64/NEON: float32x4_t, 8-wide unrolling (2× Durchsatz vs FP64).
- * Auf x86_64/SSE2:  __m128 (4×float), 8-wide unrolling.
- * Fallback: skalares C.
+ * On AArch64/NEON: float32x4_t, 8-wide unrolling (2× throughput vs FP64).
+ * On x86_64/SSE2:  __m128 (4×float), 8-wide unrolling.
+ * Fallback: scalar C.
  *
  * @ingroup fidlib_run
  */
@@ -151,7 +151,7 @@ fid_fir_dot_f32(const float *coef, const float *data, int n)
 #endif
 }
 
-/* Generischer Dispatch: FIDLIB_PRECISION_F32 → FP32-Variante, sonst FP64. */
+/* Generic dispatch: FIDLIB_PRECISION_F32 → FP32 variant, otherwise FP64. */
 #ifdef FIDLIB_PRECISION_F32
 #  define fid_fir_dot_T fid_fir_dot_f32
 #else

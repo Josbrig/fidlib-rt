@@ -71,7 +71,7 @@ free(ff);
 | `LpBeN`, `HpBeN` | Bessel LP/HP |
 | `LpChN/-dB`, `HpChN/-dB` | Chebyshev with ripple in dB |
 | `LpHm`, `LpHn`, `LpBl`, `LpBa` | Windowed FIR (Hann/Hamming/Blackman/Bartlett) |
-| `PkBq2/fc/Q/dB` | Peaking EQ biquad |
+| `PkBq2/Q/dB/fc` | Peaking EQ biquad |
 | `ApBq2/Q/fc` | Allpass biquad |
 | `BpRe/Q/fc` | Bandpass resonator |
 
@@ -133,13 +133,45 @@ Requires OpenGL 3.3+. Layout persists across sessions in `fiview2.ini`.
 
 ---
 
+## fiview2 — Browser version (WebAssembly)
+
+A fully self-contained single-file HTML port of fiview2 — no server, no installation,
+works offline via `file://`.
+
+Built with Emscripten; the fidlib + fidgen WASM module is Base64-embedded in the HTML file.
+All panels, all 10 filter families, all 8 export languages — identical feature set to the
+desktop version.
+
+To build from source:
+
+```bash
+# Install Emscripten (once)
+git clone https://github.com/emscripten-core/emsdk.git ~/tools/emsdk
+cd ~/tools/emsdk && ./emsdk install latest && ./emsdk activate latest
+source ~/tools/emsdk/emsdk_env.sh
+
+# Configure and build
+cmake -G "Unix Makefiles" -DBUILD_WEB=ON \
+      -DCMAKE_TOOLCHAIN_FILE=~/tools/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake \
+      -S . -B build-web
+cmake --build build-web -j$(nproc)
+
+# Bundle into a single offline HTML file
+python3 web/bundle.py --wasm build-web/fiview2_wasm.wasm \
+                      --js   build-web/fiview2_wasm.js \
+                      --out  dist/fiview2.html
+```
+
+---
+
 ## CMake options
 
 | Option | Default | Description |
 |---|---|---|
 | `BUILD_TOOLS` | ON | Build firun CLI tool |
 | `BUILD_FIDGEN` | ON | Build fidgen code generator |
-| `BUILD_FIVIEW2` | ON | Build fiview2 GUI workbench |
+| `BUILD_FIVIEW2` | ON | Build fiview2 GUI workbench (requires OpenGL 3.3+) |
+| `BUILD_WEB` | OFF | Build fiview2 WebAssembly port (requires Emscripten) |
 | `BUILD_TESTS` | ON | Build test suite |
 | `ENABLE_SANITIZERS` | OFF | Enable ASan + UBSan (Debug only) |
 | `FIDLIB_SIMD` | ON | NEON/SSE2 FIR hotpath acceleration |
@@ -171,7 +203,8 @@ fidlib/          Core filter library (C99, LGPL-2.1-or-later)
 firun/           CLI filter tool (GPL-2.0-or-later)
 fidgen/          Filter code generator (GPL-2.0-or-later)
 fiview2/         GUI workbench — Dear ImGui (GPL-2.0-or-later)
-tests/           Test suite (20 CTest targets)
+web/             Browser/WASM port — fiview2.html + wasm_api.cpp + bundle.py
+tests/           Test suite (CTest)
 doc/             Reference documentation
 scripts/         Build helpers, git hooks
 ```

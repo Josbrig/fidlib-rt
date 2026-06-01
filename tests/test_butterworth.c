@@ -1,13 +1,13 @@
 /*
- * Smoke-Test: Butterworth Lowpass 6. Ordnung, 400 Hz bei 44100 Hz Abtastrate.
- * Referenz: doc/examples/fiview_log.txt (LpBu6/=400)
+ * Smoke test: Butterworth lowpass 6th order, 400 Hz at 44100 Hz sample rate.
+ * Reference: doc/examples/fiview_log.txt (LpBu6/=400)
  *
- * Prueft:
- *   - DC-Gain   ~1.0     (Durchlassbereich, Toleranz 1%)
- *   - 400 Hz    ~0.707   (-3 dB, Toleranz 5%)
- *   - 4000 Hz   < 0.005  (Sperrbereich)
- *   - fidlib-Version erreichbar
- *   - fid_set_error_handler: kein exit() bei ungueltigem Filter-Spec
+ * Checks:
+ *   - DC gain   ~1.0     (passband, tolerance 1%)
+ *   - 400 Hz    ~0.707   (-3 dB, tolerance 5%)
+ *   - 4000 Hz   < 0.005  (stopband)
+ *   - fidlib version reachable
+ *   - fid_set_error_handler: no exit() on invalid filter spec
  *   - fid_run_newbuf_inplace (RT-safe, zero-alloc)
  */
 
@@ -57,11 +57,11 @@ main(void)
         printf("PASS: fid_version() = \"%s\"\n", ver);
     }
 
-    /* Filter designen */
+    /* Design filter */
     FidFilter *filt = fid_design("LpBu6/400", RATE, -1.0, -1.0, 0, NULL);
     if (!filt) FAIL("fid_design() returned NULL");
 
-    /* Frequenzgang: normierte Frequenz = f / rate */
+    /* Frequency response: normalised frequency = f / rate */
     double dc   = fid_response(filt, 0.0);
     double at_c = fid_response(filt, F_CORNER / RATE);
     double stop = fid_response(filt, F_STOP   / RATE);
@@ -70,19 +70,19 @@ main(void)
     failed += check("gain at -3dB corner", at_c, 0.67, 0.74);   /* ~1/sqrt(2) = 0.7071 */
     failed += check("gain at 10x corner",  stop, 0.0,  0.005);
 
-    /* Impulsantwort-Test: Ausgabe nach einem Impuls muss konvergieren */
+    /* Impulse response test: output must converge after a unit impulse */
     FidFunc *funcp;
     void *run  = fid_run_new(filt, &funcp);
     void *buf  = fid_run_newbuf(run);
 
-    double out0 = funcp(buf, 1.0);  /* Impuls */
+    double out0 = funcp(buf, 1.0);  /* impulse */
     double maxabs = fabs(out0);
     int i;
     for (i = 1; i < 1000; i++) {
         double y = funcp(buf, 0.0);
         if (fabs(y) > maxabs) maxabs = fabs(y);
     }
-    /* Nach 1000 Samples muss der Filter praktisch zur Ruhe gekommen sein */
+    /* After 1000 samples the filter must have practically settled */
     double tail = fabs(funcp(buf, 0.0));
     failed += check("impulse tail after 1001 samples", tail, 0.0, 1e-6);
 

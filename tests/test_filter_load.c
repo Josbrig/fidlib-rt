@@ -2,7 +2,7 @@
  * test_filter_load.c — tests for filter_load_immed / filter_load_file
  *
  * Checks: single filter, multi-filter, fixture file, /nonexistent,
- *        Fehlerfall leere Spec via longjmp-Mock.
+ *        error case: empty spec via longjmp mock.
  */
 
 #include "test_all.h"

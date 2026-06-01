@@ -12,12 +12,28 @@ target_include_directories(fidlib
   PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-find_library(MATH_LIB m)
-target_link_libraries(fidlib PUBLIC ${MATH_LIB})
+if(NOT EMSCRIPTEN)
+  find_library(MATH_LIB m)
+  target_link_libraries(fidlib PUBLIC ${MATH_LIB})
+else()
+  # Emscripten/Clang: suppress warnings that don't apply to C99 fidlib
+  target_compile_options(fidlib PRIVATE
+    -Wno-missing-format-attribute
+    -Wno-nan-infinity-disabled
+    -Wno-unused-but-set-variable
+    -Wno-float-conversion
+    -Wno-implicit-int-float-conversion
+    -Wno-format-nonliteral
+    -Wno-missing-prototypes
+    -Wno-sign-conversion
+    -Wno-unused-function
+  )
+endif()
 
 # C++20 compatibility mode: compile fidlib.c as C++20 to catch type errors
+# Disabled for Emscripten: Clang rejects deprecated C-as-C++ treatment
 option(FIDLIB_CXX20_COMPAT "Compile fidlib with C++20 (analysis + safety)" OFF)
-if(FIDLIB_CXX20_COMPAT)
+if(FIDLIB_CXX20_COMPAT AND NOT EMSCRIPTEN)
   set_source_files_properties(fidlib.c PROPERTIES LANGUAGE CXX)
   target_compile_options(fidlib PRIVATE
     -std=c++20
@@ -49,12 +65,12 @@ if(FIDLIB_SIMD)
     target_compile_options(fidlib PRIVATE -msse2)
     message(STATUS "fidlib SIMD: SSE2 (${CMAKE_SYSTEM_PROCESSOR})")
   else()
-    message(STATUS "fidlib SIMD: skalarer Fallback (${CMAKE_SYSTEM_PROCESSOR} unbekannt)")
+    message(STATUS "fidlib SIMD: scalar fallback (${CMAKE_SYSTEM_PROCESSOR} unknown)")
   endif()
 endif()
 
 # Execution precision: double (FP64, default) or float (FP32, GPU/SIMD preparation)
-# Bei FP32: FIR-Filter ~2x schnellere NEON-Vektorisierung; IIR kann numerisch instabil werden.
+# At FP32: FIR filters ~2x faster NEON vectorisation; IIR may become numerically unstable.
 set(FIDLIB_PRECISION "double" CACHE STRING
     "Filter execution precision: double (FP64, default) or float (FP32)")
 set_property(CACHE FIDLIB_PRECISION PROPERTY STRINGS "double" "float")
@@ -63,7 +79,7 @@ if(FIDLIB_PRECISION STREQUAL "float")
   target_compile_definitions(fidlib PUBLIC FID_REAL=float FIDLIB_PRECISION_F32)
   message(STATUS "fidlib PRECISION: float (FP32) — WARNING: IIR filters may become unstable!")
 else()
-  message(STATUS "fidlib PRECISION: double (FP64, Standard)")
+  message(STATUS "fidlib PRECISION: double (FP64, default)")
 endif()
 
 # Overlap-save FFT convolution for long FIR filters (avoids O(N^2) hotpath)
@@ -86,7 +102,7 @@ if(FIDLIB_FFT)
     message(STATUS "fidlib FFT: Overlap-Save + FFTW3 ${FFTW3_VERSION}")
     message(STATUS "LICENSE NOTE: FFTW3 is GPL-2.0-or-later — any binary linking fidlib+FFTW3 is subject to GPL 2.0 terms.")
   else()
-    message(STATUS "fidlib FFT: Overlap-Save + built-in Radix-2 (FFTW3 nicht gefunden)")
+    message(STATUS "fidlib FFT: Overlap-Save + built-in Radix-2 (FFTW3 not found)")
   endif()
 endif()
 
@@ -99,11 +115,11 @@ set(FIDLIB_VULKAN_BATCH 256 CACHE STRING
 if(FIDLIB_VULKAN)
   find_package(Vulkan QUIET)
   if(NOT Vulkan_FOUND)
-    message(WARNING "fidlib VULKAN: Vulkan nicht gefunden — FIDLIB_VULKAN deaktiviert "
+    message(WARNING "fidlib VULKAN: Vulkan not found — FIDLIB_VULKAN disabled "
                     "(apt install libvulkan-dev)")
     set(FIDLIB_VULKAN OFF CACHE BOOL "" FORCE)
   else()
-    # Suche Shader-Compiler: glslc (bevorzugt) oder glslangValidator
+    # Find shader compiler: glslc (preferred) or glslangValidator
     find_program(GLSLC_EXECUTABLE NAMES glslc)
     find_program(GLSLANG_EXECUTABLE NAMES glslangValidator)
     if(GLSLC_EXECUTABLE)
@@ -113,21 +129,21 @@ if(FIDLIB_VULKAN)
       set(_SHADER_COMPILER "${GLSLANG_EXECUTABLE}")
       set(_SHADER_FLAGS    "-V")
     else()
-      message(WARNING "fidlib VULKAN: kein GLSL-Compiler (glslc/glslangValidator) gefunden — "
-                      "Shader kann nicht kompiliert werden; FIDLIB_VULKAN deaktiviert")
+      message(WARNING "fidlib VULKAN: no GLSL compiler (glslc/glslangValidator) found — "
+                      "shader cannot be compiled; FIDLIB_VULKAN disabled")
       set(FIDLIB_VULKAN OFF CACHE BOOL "" FORCE)
     endif()
   endif()
 endif()
 if(FIDLIB_VULKAN)
   message(WARNING
-    "LICENSE: FIDLIB_VULKAN=ON bindet Vulkan-Headers (Khronos, Apache-2.0) ein. "
-    "Apache-2.0 ist FSF-inkompatibel mit GPL-2.0-only. "
-    "Binaries, die fidlib+Vulkan zusammen mit fiview oder firun (GPL-2.0-only) verlinken, "
-    "koennen NICHT legal weiterverbreitet werden. "
-    "Zulaessig: fidlib allein als LGPL-2.1-Bibliothek mit FIDLIB_VULKAN=ON (ohne fiview/firun). "
-    "Details: doc/legal/lizenz-analyse.md Abschnitt 2.3.")
-  # Kompiliere GLSL Compute-Shader zu SPIR-V und bette als C-Array ein
+    "LICENSE: FIDLIB_VULKAN=ON links Vulkan headers (Khronos, Apache-2.0). "
+    "Apache-2.0 is FSF-incompatible with GPL-2.0-only. "
+    "Binaries linking fidlib+Vulkan together with fiview or firun (GPL-2.0-only) "
+    "CANNOT be legally redistributed. "
+    "Permitted: fidlib alone as LGPL-2.1 library with FIDLIB_VULKAN=ON (without fiview/firun). "
+    "Details: doc/legal/lizenz-analyse.md section 2.3.")
+  # Compile GLSL compute shader to SPIR-V and embed as C array
   set(_SHADER_SRC  "${CMAKE_CURRENT_SOURCE_DIR}/fir_dot.comp")
   set(_SHADER_SPV  "${CMAKE_CURRENT_BINARY_DIR}/fir_dot.spv")
   set(_SHADER_HDR  "${CMAKE_CURRENT_BINARY_DIR}/fir_dot_spv.h")
@@ -135,7 +151,7 @@ if(FIDLIB_VULKAN)
     OUTPUT  "${_SHADER_SPV}"
     COMMAND "${_SHADER_COMPILER}" ${_SHADER_FLAGS} -o "${_SHADER_SPV}" "${_SHADER_SRC}"
     DEPENDS "${_SHADER_SRC}"
-    COMMENT "Kompiliere fir_dot.comp → SPIR-V"
+    COMMENT "Compile fir_dot.comp → SPIR-V"
   )
   add_custom_command(
     OUTPUT  "${_SHADER_HDR}"
@@ -144,7 +160,7 @@ if(FIDLIB_VULKAN)
             -D OUTPUT="${_SHADER_HDR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/spv_to_header.cmake"
     DEPENDS "${_SHADER_SPV}"
-    COMMENT "Bette SPIR-V als C-Array ein → fir_dot_spv.h"
+    COMMENT "Embed SPIR-V as C array → fir_dot_spv.h"
   )
   # Create an INTERFACE target for the generated header
   add_custom_target(fir_dot_spv_header DEPENDS "${_SHADER_HDR}")
@@ -161,8 +177,8 @@ if(FIDLIB_VULKAN)
 endif()
 
 # ── OpenCL: GPU-FIR for desktop / Jetson (FP32; RPi5 needs Rusticl-Mesa)
-# Standard-RPi5: Clover liefert 0 Devices → FIDLIB_OPENCL bringt dort keinen GPU-Nutzen.
-# Explizit setzen: -DFIDLIB_OPENCL=ON (z.B. Desktop-PC, NVIDIA Jetson).
+# Stock RPi5: Clover yields 0 devices → FIDLIB_OPENCL provides no GPU benefit there.
+# Enable explicitly: -DFIDLIB_OPENCL=ON (e.g. desktop PC, NVIDIA Jetson).
 option(FIDLIB_OPENCL "OpenCL backend for GPU-FIR (desktop/Jetson; RPi5 needs Rusticl)" OFF)
 set(FIDLIB_OPENCL_THRESHOLD 256 CACHE STRING
     "FIR tap threshold for automatic OpenCL switching")
@@ -171,14 +187,14 @@ set(FIDLIB_OPENCL_BATCH 256 CACHE STRING
 if(FIDLIB_OPENCL)
   find_package(OpenCL QUIET)
   if(NOT OpenCL_FOUND)
-    message(WARNING "fidlib OPENCL: keine OpenCL-Entwicklungsdateien gefunden — "
-                    "FIDLIB_OPENCL deaktiviert (apt install opencl-headers ocl-icd-opencl-dev)")
+    message(WARNING "fidlib OPENCL: no OpenCL development files found — "
+                    "FIDLIB_OPENCL disabled (apt install opencl-headers ocl-icd-opencl-dev)")
     set(FIDLIB_OPENCL OFF CACHE BOOL "" FORCE)
   else()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-      message(WARNING "fidlib OPENCL: aarch64 ohne Rusticl hat keine GPU-OpenCL-Devices. "
-                      "FIDLIB_OPENCL ist aktiv, aber auf Standard-RPi5 findet der Laufzeit-Init "
-                      "no compute device found, falls back to NEON/scalar.")
+      message(WARNING "fidlib OPENCL: aarch64 without Rusticl has no GPU OpenCL devices. "
+                      "FIDLIB_OPENCL is active but on a stock RPi5 the runtime will report "
+                      "no compute device found and fall back to NEON/scalar.")
     endif()
     target_compile_definitions(fidlib PUBLIC
         FIDLIB_OPENCL

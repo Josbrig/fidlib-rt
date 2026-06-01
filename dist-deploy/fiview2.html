@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fiview2 — Filter Design Workbench</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #12121a;
+  --bg2:     #1a1a26;
+  --bg3:     #22222f;
+  --border:  #3a3a50;
+  --text:    #c8c8d8;
+  --text2:   #888899;
+  --accent:  #64c8ff;
+  --green:   #64ff96;
+  --red:     #ff6464;
+  --yellow:  #ffcc44;
+  --plot-bg: #14141f;
+}
+body { background: var(--bg); color: var(--text); font: 13px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+#layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px; padding: 4px;
+  height: 100dvh;
+  grid-template-areas:
+    "params  freq    pz"
+    "params  impulse panels";
+}
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.panel-header {
+  background: var(--bg3);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.panel-body { flex: 1; overflow: auto; padding: 6px; min-height: 0; }
+#panel-params { grid-area: params; }
+#panel-freq   { grid-area: freq; }
+#panel-pz     { grid-area: pz; }
+#panel-impulse{ grid-area: impulse; }
+#panel-panels { grid-area: panels; display: flex; flex-direction: column; gap: 4px; }
+/* sub-panels inside right column */
+#panel-panels .panel { flex: 1; }
+
+/* Controls */
+label { display: block; font-size: 11px; color: var(--text2); margin: 8px 0 2px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=number], input[type=text], select, textarea {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); padding: 3px 6px; border-radius: 3px;
+  font: inherit; width: 100%;
+}
+input[type=number] { width: 70px; }
+.row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.row label { margin: 0; }
+button, .btn {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); padding: 2px 8px; border-radius: 3px;
+  cursor: pointer; font: 11px inherit; transition: background .1s;
+}
+button:hover { background: var(--border); }
+button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.rate-btns { display: flex; flex-wrap: wrap; gap: 3px; }
+.spec-row { display: flex; gap: 4px; }
+.spec-row input { flex: 1; font-family: monospace; font-size: 11px; }
+.status-ok   { color: var(--green); font-weight: bold; }
+.status-err  { color: var(--red);   font-weight: bold; }
+.status-warn { color: var(--yellow);}
+canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.canvas-wrap { position: relative; flex: 1; min-height: 0; }
+.tooltip {
+  position: fixed; background: rgba(20,20,30,.95); border: 1px solid var(--border);
+  padding: 4px 8px; border-radius: 3px; font-size: 11px; pointer-events: none;
+  z-index: 100; display: none; white-space: nowrap;
+}
+.slider-row { display: flex; align-items: center; gap: 4px; }
+.slider-row input[type=range] { flex: 1; }
+.slider-num { width: 62px !important; flex-shrink: 0; text-align: right; padding: 2px 4px; }
+.export-area { font-family: monospace; font-size: 11px; resize: vertical;
+  min-height: 80px; max-height: 200px; }
+.tab-bar { display: flex; gap: 2px; margin-bottom: 6px; flex-wrap: wrap; }
+.stability-bar { height: 6px; background: var(--bg3); border-radius: 3px; margin: 4px 0; }
+.stability-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.compare-slot { display: flex; align-items: center; gap: 6px; padding: 3px 0;
+  border-bottom: 1px solid var(--border); }
+.color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+#loading { position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; z-index: 999; }
+
+@media (max-width: 900px) {
+  #layout { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto;
+    grid-template-areas: "params freq" "pz impulse" "panels panels"; }
+}
+@media (max-width: 560px) {
+  #layout { grid-template-columns: 1fr; grid-template-rows: repeat(5, auto);
+    grid-template-areas: "params" "freq" "pz" "impulse" "panels"; height: auto; overflow: auto; }
+}
+</style>
+</head>
+<body>
+
+<div id="loading">Loading WASM…</div>
+<div id="tooltip" class="tooltip"></div>
+
+<div id="layout">
+
+<!-- ── Parameters ─────────────────────────────────────────────── -->
+<div class="panel" id="panel-params">
+  <div class="panel-header">
+    <span>Parameters</span>
+    <span id="spec-display" style="font-family:monospace;font-size:10px;color:var(--accent)"></span>
+  </div>
+  <div class="panel-body">
+    <label>Sample rate</label>
+    <div class="rate-btns" id="rate-btns"></div>
+    <div class="row" style="margin-top:4px">
+      <input type="number" id="rate-input" min="10" max="384000" step="1" style="width:100%">
+    </div>
+
+    <label>Filter family</label>
+    <select id="family"></select>
+
+    <label>Passband</label>
+    <select id="passband">
+      <option value="0">Low-pass</option>
+      <option value="1">High-pass</option>
+      <option value="2">Band-pass</option>
+      <option value="3">Band-stop</option>
+    </select>
+
+    <div id="order-row">
+      <label id="order-label">Order</label>
+      <div class="slider-row">
+        <input type="range" id="order" min="1" max="20" value="4">
+        <input type="number" id="order-num" min="1" max="20" step="1" value="4" class="slider-num">
+      </div>
+    </div>
+
+    <div id="fc1-row">
+      <label id="fc1-label">Cutoff fc1 (Hz)</label>
+      <div class="slider-row">
+        <input type="range" id="fc1" min="0" max="1" step="0.0001" value="0.05">
+        <input type="number" id="fc1-num" min="1" step="0.1" class="slider-num">
+      </div>
+    </div>
+    <div id="fc2-row" style="display:none">
+      <label>Upper cutoff fc2 (Hz)</label>
+      <div class="slider-row">
+        <input type="range" id="fc2" min="0" max="1" step="0.0001" value="0.1">
+        <input type="number" id="fc2-num" min="1" step="0.1" class="slider-num">
+      </div>
+    </div>
+
+    <div id="ripple-row" style="display:none">
+      <label>Ripple (dB)</label>
+      <div class="slider-row">
+        <input type="range" id="ripple" min="-60" max="-0.1" step="0.1" value="-1">
+        <input type="number" id="ripple-num" min="-60" max="-0.001" step="0.1" value="-1" class="slider-num">
+      </div>
+    </div>
+    <div id="q-row" style="display:none">
+      <label>Q factor</label>
+      <div class="slider-row">
+        <input type="range" id="q-slider" min="-2" max="2" step="0.01" value="0">
+        <input type="number" id="q-num" min="0.001" max="200" step="0.001" value="1" class="slider-num">
+      </div>
+    </div>
+    <div id="gain-row" style="display:none">
+      <label>Gain (dB)</label>
+      <div class="slider-row">
+        <input type="range" id="gain" min="-40" max="40" step="0.1" value="6">
+        <input type="number" id="gain-num" min="-40" max="40" step="0.1" value="6" class="slider-num">
+      </div>
+    </div>
+
+    <label>Spec (fidlib)</label>
+    <div class="spec-row">
+      <input type="text" id="spec-raw" placeholder="Enter spec + press Enter">
+      <button id="spec-copy">Copy</button>
+    </div>
+    <div id="spec-status" style="font-size:11px;margin-top:3px"></div>
+
+    <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
+      <button id="btn-save">Save</button>
+      <button id="btn-load-file">Load…</button>
+      <button id="btn-wizard">Wizard…</button>
+    </div>
+    <input type="file" id="file-input" accept=".json" style="display:none">
+  </div>
+</div>
+
+<!-- ── Frequency Response ──────────────────────────────────────── -->
+<div class="panel" id="panel-freq">
+  <div class="panel-header">
+    <span>Frequency Response</span>
+    <div class="row" style="gap:8px">
+      <label class="row" style="gap:3px"><input type="checkbox" id="show-phase"> Phase</label>
+      <label class="row" style="gap:3px"><input type="checkbox" id="show-cascade" checked> Cascade</label>
+      <label class="row" style="gap:3px"><input type="checkbox" id="auto-y" checked> Auto Y</label>
+      <button id="freq-reset-zoom" style="padding:1px 6px">Reset Zoom</button>
+    </div>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="freq-canvas"></canvas>
+  </div>
+</div>
+
+<!-- ── Pole/Zero ───────────────────────────────────────────────── -->
+<div class="panel" id="panel-pz">
+  <div class="panel-header">
+    <span>Poles / Zeros</span>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="pz-canvas"></canvas>
+  </div>
+</div>
+
+<!-- ── Impulse / Step ─────────────────────────────────────────── -->
+<div class="panel" id="panel-impulse">
+  <div class="panel-header">
+    <span>Impulse / Step Response</span>
+    <div class="row" style="gap:8px">
+      <label class="row" style="gap:3px"><input type="checkbox" id="show-step"> Step</label>
+      <label class="row" style="gap:3px">
+        Samples: <input type="number" id="n-samples" value="512" min="16" max="4096" style="width:60px">
+      </label>
+      <button id="impulse-reset-zoom" style="padding:1px 6px">Reset Zoom</button>
+    </div>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="impulse-canvas"></canvas>
+  </div>
+</div>
+
+<!-- ── Right side panels ──────────────────────────────────────── -->
+<div id="panel-panels">
+
+  <!-- Stability + Compare + Export tabs -->
+  <div class="panel" style="flex:1">
+    <div class="panel-header" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <div class="tab-bar" id="right-tabs">
+        <button class="active" data-tab="stability">Stability</button>
+        <button data-tab="cascade">Cascade</button>
+        <button data-tab="compare">A/B Compare</button>
+        <button data-tab="export">Export</button>
+      </div>
+    </div>
+    <div class="panel-body">
+
+      <!-- Stability -->
+      <div id="tab-stability">
+        <div id="stability-status" style="font-size:14px;margin-bottom:4px"></div>
+        <div id="stability-bar-wrap">
+          <div class="stability-bar"><div class="stability-fill" id="stability-fill"></div></div>
+        </div>
+        <div id="stability-info" style="font-size:11px;color:var(--text2)"></div>
+        <div id="stability-warn" style="font-size:11px;color:var(--yellow);margin-top:4px"></div>
+        <button id="order-minus2" style="display:none;margin-top:6px">Order −2</button>
+        <hr style="border-color:var(--border);margin:8px 0">
+        <div style="font-size:11px;color:var(--text2)">Guided Mode</div>
+        <button id="btn-wizard2" style="margin-top:4px">Open Wizard…</button>
+      </div>
+
+      <!-- Cascade -->
+      <div id="tab-cascade" style="display:none">
+        <table id="sos-table" style="width:100%;font-size:11px;border-collapse:collapse">
+          <thead><tr style="color:var(--text2)">
+            <th style="text-align:left">Stage</th>
+            <th>b0</th><th>b1</th><th>b2</th>
+            <th>a1</th><th>a2</th>
+          </tr></thead>
+          <tbody id="sos-body"></tbody>
+        </table>
+      </div>
+
+      <!-- A/B Compare -->
+      <div id="tab-compare" style="display:none">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px">
+          Freeze current filter into A/B/C/D slot:
+        </div>
+        <div class="row" style="margin-bottom:8px;gap:4px">
+          <button onclick="freezeSlot(0)">Freeze A</button>
+          <button onclick="freezeSlot(1)">Freeze B</button>
+          <button onclick="freezeSlot(2)">Freeze C</button>
+          <button onclick="freezeSlot(3)">Freeze D</button>
+        </div>
+        <div id="compare-slots"></div>
+      </div>
+
+      <!-- Export -->
+      <div id="tab-export" style="display:none">
+        <div class="tab-bar" id="lang-tabs" style="margin-bottom:6px">
+          <button class="active" data-lang="c99">C99</button>
+          <button data-lang="cpp20">C++20</button>
+          <button data-lang="python">Python</button>
+          <button data-lang="rust">Rust</button>
+          <button data-lang="matlab">MATLAB</button>
+          <button data-lang="julia">Julia</button>
+          <button data-lang="verilog">Verilog</button>
+          <button data-lang="systemverilog">SV</button>
+        </div>
+        <textarea id="export-code" class="export-area" readonly></textarea>
+        <div class="row" style="margin-top:4px;gap:4px">
+          <button id="btn-copy-code">Copy</button>
+          <button id="btn-download-code">Download</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- end #panel-panels -->
+
+</div><!-- end #layout -->
+
+<!-- ── Guided Mode Wizard ─────────────────────────────────────── -->
+<dialog id="wizard-dialog" style="background:var(--bg2);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);padding:16px;min-width:320px">
+  <div style="font-size:13px;font-weight:bold;margin-bottom:12px">Filter Wizard</div>
+  <div id="wizard-step1">
+    <div style="margin-bottom:8px">What are you filtering?</div>
+    <div id="wizard-usecase" style="display:flex;flex-direction:column;gap:4px">
+      <label><input type="radio" name="uc" value="0"> Audio signal</label>
+      <label><input type="radio" name="uc" value="1"> Sensor data</label>
+      <label><input type="radio" name="uc" value="2"> EEG / biosignal</label>
+      <label><input type="radio" name="uc" value="3"> Custom</label>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:6px">
+      <button id="wiz-next">Next →</button>
+      <button id="wiz-cancel">Cancel</button>
+    </div>
+  </div>
+  <div id="wizard-step2" style="display:none">
+    <div style="margin-bottom:8px">What are you trying to remove?</div>
+    <div id="wizard-bother" style="display:flex;flex-direction:column;gap:4px">
+      <label><input type="radio" name="wb" value="0"> High-frequency noise</label>
+      <label><input type="radio" name="wb" value="1"> DC drift / offset</label>
+      <label><input type="radio" name="wb" value="2"> Mains hum (50/60 Hz)</label>
+      <label><input type="radio" name="wb" value="3"> Vibration / low-freq rumble</label>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:6px">
+      <button id="wiz-back">← Back</button>
+      <button id="wiz-apply">Apply</button>
+      <button id="wiz-cancel2">Cancel</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// fiview2.html — Filter Design Workbench (Web port)
+// ════════════════════════════════════════════════════════════════
+
+// ── State ────────────────────────────────────────────────────────
+const FAMILIES = [
+  {name:'Butterworth', key:'Bu', fir:false, special:false},
+  {name:'Bessel',      key:'Be', fir:false, special:false, maxOrder:10},
+  {name:'Chebyshev',   key:'Ch', fir:false, special:false},
+  {name:'FIR Hann',    key:'Hm', fir:true,  special:false},
+  {name:'FIR Hamming', key:'Hn', fir:true,  special:false},
+  {name:'FIR Blackman',key:'Bl', fir:true,  special:false},
+  {name:'FIR Bartlett',key:'Ba', fir:true,  special:false},
+  {name:'Peaking EQ',  key:'Bq', fir:false, special:true,  pb:'Pk'},
+  {name:'Allpass Biquad',key:'Bq',fir:false,special:true,  pb:'Ap'},
+  {name:'BP Resonator',key:'Re', fir:false, special:true,  pb:'Bp'},
+];
+const PASSBANDS = ['Lp','Hp','Bp','Bs'];
+const RATE_BTNS = [
+  {label:'8k',  rate:8000},  {label:'22.05k',rate:22050},
+  {label:'44.1k',rate:44100},{label:'48k',   rate:48000},
+  {label:'96k', rate:96000}, {label:'192k',  rate:192000},
+  {label:'250', rate:250},   {label:'1k',    rate:1000},  {label:'10k',rate:10000},
+];
+const COMPARE_COLORS = ['#ff6666','#66ff88','#6688ff','#ffee44'];
+
+const state = {
+  family: 0, passband: 0, order: 4,
+  rate: 44100, fc1: 1000, fc2: 2000,
+  ripple: -1.0, q: 1.0, gain: 6.0,
+  rawSpec: '',
+  result: { valid: false, spec: '', error: '', freqResp: [], impulse: [], step: [], pz: [] },
+  compare: [null,null,null,null],
+  // Zoom state
+  freqZoom: { lo: 1, hi: 22050 },
+  impulseZoom: { lo: 0, hi: 1 },
+  showPhase: false, showCascade: true, autoY: true, showStep: false,
+  nSamples: 512,
+  currentLang: 'c99',
+  currentTab: 'stability',
+};
+
+let wasm = null;
+
+// ── WASM helpers ─────────────────────────────────────────────────
+function wasmStr(fn, ...args) {
+  const types = args.map(a => typeof a === 'number' ? 'number' : 'string');
+  const ptr = wasm.ccall(fn, 'number', types, args);
+  if (!ptr) return null;
+  const s = wasm.UTF8ToString(ptr);
+  wasm.ccall('wasm_free_string', null, ['number'], [ptr]);
+  return s;
+}
+
+function buildSpec() {
+  if (state.rawSpec) return state.rawSpec;
+  const f = FAMILIES[state.family];
+  const pb = PASSBANDS[state.passband];
+  if (f.fir) {
+    return `${pb}${f.key}/${state.fc1.toFixed(4)}`;
+  }
+  if (f.special) {
+    const p = f.pb;
+    if (p === 'Pk') return `${p}${f.key}${state.order}/${state.fc1.toFixed(4)}/${state.q.toFixed(4)}/${state.gain.toFixed(2)}`;
+    if (p === 'Ap') return `${p}${f.key}${state.order}/${state.q.toFixed(4)}/${state.fc1.toFixed(4)}`;
+    return `${p}${f.key}/${state.q.toFixed(4)}/${state.fc1.toFixed(4)}`;
+  }
+  if (f.key === 'Ch') {
+    const bpbs = state.passband >= 2;
+    const s = `${pb}${f.key}${state.order}/${state.ripple.toFixed(2)}/${state.fc1.toFixed(4)}`;
+    return bpbs ? s + `-${state.fc2.toFixed(4)}` : s;
+  }
+  const bpbs = !f.fir && !f.special && state.passband >= 2;
+  const s = `${pb}${f.key}${state.order}/${state.fc1.toFixed(4)}`;
+  return bpbs ? s + `-${state.fc2.toFixed(4)}` : s;
+}
+
+function update() {
+  const spec = buildSpec();
+  const rate = state.rate;
+  state.result.spec = spec;
+  state.result.valid = false;
+  state.result.error = '';
+
+  const freqJson = wasmStr('wasm_freq_response_json', spec, rate);
+  if (!freqJson) {
+    state.result.error = wasm.ccall('wasm_last_error','string',[],[]) || 'fid_design failed';
+    renderAll();
+    return;
+  }
+
+  state.result.freqResp = JSON.parse(freqJson);
+  state.result.impulse = JSON.parse(wasmStr('wasm_impulse_json', spec, rate, state.nSamples) || '[]');
+  state.result.step    = JSON.parse(wasmStr('wasm_step_json',    spec, rate, state.nSamples) || '[]');
+  state.result.pz      = JSON.parse(wasmStr('wasm_poles_zeros_json', spec, rate) || '[]');
+  state.result.valid   = true;
+
+  // Update nyquist zoom reset on rate change
+  state.freqZoom.hi = rate * 0.5;
+  if (state.freqZoom.lo >= state.freqZoom.hi) state.freqZoom.lo = 1;
+
+  renderAll();
+  if (state.currentTab === 'export') updateExport();
+}
+
+// ── Canvas plot utilities ─────────────────────────────────────────
+function resizeCanvas(canvas) {
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+  }
+}
+
+function logNorm(f, lo, hi) { return Math.log(f/lo) / Math.log(hi/lo); }
+function logDenorm(t, lo, hi) { return lo * Math.pow(hi/lo, t); }
+
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(Math.abs(raw) + 1e-30)));
+  let step;
+  if      (raw/mag < 1.5) step = mag;
+  else if (raw/mag < 3.5) step = 2*mag;
+  else if (raw/mag < 7.5) step = 5*mag;
+  else                    step = 10*mag;
+  const ticks = [];
+  let t = Math.ceil(lo/step)*step;
+  while (t <= hi + step*0.01) { ticks.push(t); t += step; }
+  return ticks;
+}
+
+// ── Frequency Response Plot ───────────────────────────────────────
+const freqCanvas = document.getElementById('freq-canvas');
+let freqDrag = null;
+
+function drawFreqPlot() {
+  resizeCanvas(freqCanvas);
+  const ctx = freqCanvas.getContext('2d');
+  const W = freqCanvas.width, H = freqCanvas.height;
+  if (!W || !H) return;
+
+  const Y_AX = 48, X_AX = 18;
+  const pw = W - Y_AX, ph = H - X_AX;
+  const px = Y_AX, py = 0;
+
+  ctx.fillStyle = '#14141f';
+  ctx.fillRect(0, 0, W, H);
+
+  const fr = state.result.freqResp;
+  const { lo: fLo, hi: fHi } = state.freqZoom;
+
+  // Auto Y range
+  let dbMin = Infinity, dbMax = -Infinity;
+  if (state.autoY && fr.length) {
+    for (const p of fr) { if (isFinite(p.m)) { dbMin=Math.min(dbMin,p.m); dbMax=Math.max(dbMax,p.m); } }
+    for (const c of state.compare) { if (c) for (const p of c.freqResp) { if (isFinite(p.m)) { dbMin=Math.min(dbMin,p.m); dbMax=Math.max(dbMax,p.m); } } }
+    if (!isFinite(dbMin)) { dbMin=-120; dbMax=20; }
+    const step = niceTicks(dbMin,dbMax,8)[1] - niceTicks(dbMin,dbMax,8)[0] || 10;
+    dbMin = Math.floor(dbMin/step)*step - step;
+    dbMax = Math.ceil (dbMax/step)*step + 3;
+    if (dbMax-dbMin < 40) { const m=(dbMax+dbMin)/2; dbMax=m+20; dbMin=m-20; }
+  } else { dbMin=-120; dbMax=20; }
+
+  function dbToY(db) { return py + ph*(1-(db-dbMin)/(dbMax-dbMin)); }
+  function fToX(f)   { return px + logNorm(Math.max(f,fLo*0.99),fLo,fHi)*pw; }
+
+  // dB grid
+  ctx.strokeStyle='#333348'; ctx.lineWidth=1;
+  ctx.fillStyle='#888899'; ctx.font='10px sans-serif';
+  for (const db of niceTicks(dbMin,dbMax,8)) {
+    const y = dbToY(db); if (y<py-2||y>py+ph+2) continue;
+    ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px+pw,y); ctx.stroke();
+    ctx.fillText(`${db.toFixed(db===0?0:1)}`, 0, y+3);
+  }
+
+  // Freq grid (log)
+  const freqMarks = [1,2,5,10,20,50,100,200,500,1e3,2e3,5e3,1e4,2e4,5e4,1e5];
+  ctx.fillStyle='#888899';
+  for (const f of freqMarks) {
+    if (f<fLo||f>fHi) continue;
+    const x = fToX(f);
+    ctx.strokeStyle='#333348'; ctx.beginPath(); ctx.moveTo(x,py); ctx.lineTo(x,py+ph); ctx.stroke();
+    const lbl = f>=1000 ? `${f/1000}k` : `${f}`;
+    ctx.fillText(lbl, x+2, py+ph+12);
+  }
+
+  // Nyquist
+  const xnyq = fToX(state.rate/2);
+  ctx.strokeStyle='rgba(255,80,80,.4)'; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(xnyq,py); ctx.lineTo(xnyq,py+ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Zero dB line
+  const y0 = dbToY(0);
+  if (y0>=py && y0<=py+ph) {
+    ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.beginPath(); ctx.moveTo(px,y0); ctx.lineTo(px+pw,y0); ctx.stroke();
+  }
+
+  // Compare curves
+  for (let i=0;i<4;i++) {
+    const c = state.compare[i]; if(!c) continue;
+    ctx.strokeStyle = COMPARE_COLORS[i]+'b0'; ctx.lineWidth=1.5;
+    ctx.beginPath(); let first=true;
+    for (const p of c.freqResp) {
+      if (p.f<fLo||p.f>fHi) continue;
+      const x=fToX(p.f), y=dbToY(Math.max(dbMin-5,Math.min(dbMax+5,p.m)));
+      first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // Main curve
+  if (fr.length) {
+    ctx.strokeStyle='#64c8ff'; ctx.lineWidth=2;
+    ctx.beginPath(); let first=true;
+    for (const p of fr) {
+      if (p.f<fLo||p.f>fHi) continue;
+      const x=fToX(p.f), y=dbToY(Math.max(dbMin-5,Math.min(dbMax+5,p.m)));
+      first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // Phase overlay
+    if (state.showPhase) {
+      ctx.strokeStyle='rgba(100,200,100,.5)'; ctx.lineWidth=1;
+      ctx.beginPath(); first=true;
+      for (const p of fr) {
+        if (p.f<fLo||p.f>fHi) continue;
+        const x=fToX(p.f), y=py+ph*(1-(p.p+180)/360);
+        first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Cascade
+  if (state.showCascade && fr.length) {
+    ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); let first=true;
+    for (const p of fr) {
+      if (p.f<fLo||p.f>fHi) continue;
+      const x=fToX(p.f), y=dbToY(Math.max(dbMin-5,Math.min(dbMax+5,p.m)));
+      first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // Border
+  ctx.strokeStyle='#3a3a50'; ctx.lineWidth=1;
+  ctx.strokeRect(px,py,pw,ph);
+}
+
+freqCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const {lo,hi} = state.freqZoom;
+  const rect = freqCanvas.getBoundingClientRect();
+  const tx = (e.clientX - rect.left - 48) / (rect.width - 48);
+  const fc = logDenorm(Math.max(0,Math.min(1,tx)), lo, hi);
+  const factor = e.deltaY > 0 ? 1.35 : 1/1.35;
+  let newLo = fc * Math.pow(lo/fc, factor);
+  let newHi = fc * Math.pow(hi/fc, factor);
+  newLo = Math.max(newLo, 1);
+  newHi = Math.min(newHi, state.rate/2);
+  if (Math.log(newHi/newLo) >= Math.log(4)) { state.freqZoom={lo:newLo,hi:newHi}; drawFreqPlot(); }
+}, {passive:false});
+
+freqCanvas.addEventListener('pointerdown', e => {
+  freqDrag = {x:e.clientX, lo:state.freqZoom.lo, hi:state.freqZoom.hi};
+  freqCanvas.setPointerCapture(e.pointerId);
+});
+freqCanvas.addEventListener('pointermove', e => {
+  if (!freqDrag) return;
+  const w = freqCanvas.getBoundingClientRect().width - 48;
+  const dx = e.clientX - freqDrag.x;
+  const logRange = Math.log(freqDrag.hi/freqDrag.lo);
+  const shift = -(dx/w)*logRange;
+  let lo2 = freqDrag.lo * Math.exp(shift);
+  let hi2 = freqDrag.hi * Math.exp(shift);
+  if (lo2<1||hi2>state.rate/2) return;
+  state.freqZoom={lo:lo2,hi:hi2}; drawFreqPlot();
+  showFreqTooltip(e);
+});
+freqCanvas.addEventListener('pointerup', () => freqDrag=null);
+freqCanvas.addEventListener('dblclick', () => {
+  state.freqZoom={lo:1,hi:state.rate/2}; drawFreqPlot();
+});
+freqCanvas.addEventListener('mousemove', showFreqTooltip);
+freqCanvas.addEventListener('mouseleave', () => { document.getElementById('tooltip').style.display='none'; });
+
+function showFreqTooltip(e) {
+  const rect = freqCanvas.getBoundingClientRect();
+  const tx = (e.clientX - rect.left - 48) / (rect.width - 48);
+  const {lo,hi} = state.freqZoom;
+  const freq = logDenorm(Math.max(0,Math.min(1,tx)), lo, hi);
+  const fr = state.result.freqResp;
+  if (!fr.length) return;
+  // Find nearest point
+  let best = fr[0], bestDist = Infinity;
+  for (const p of fr) { const d=Math.abs(Math.log(p.f/freq)); if(d<bestDist){bestDist=d;best=p;} }
+  const tt = document.getElementById('tooltip');
+  tt.style.display='block';
+  tt.style.left=(e.clientX+12)+'px';
+  tt.style.top =(e.clientY-6)+'px';
+  tt.innerHTML=`${freq.toFixed(1)} Hz<br>${best.m.toFixed(2)} dB  ${best.p.toFixed(1)}°`;
+}
+
+document.getElementById('freq-reset-zoom').onclick = () => {
+  state.freqZoom={lo:1,hi:state.rate/2}; drawFreqPlot();
+};
+
+// ── Pole/Zero Plot ────────────────────────────────────────────────
+const pzCanvas = document.getElementById('pz-canvas');
+
+function drawPzPlot() {
+  resizeCanvas(pzCanvas);
+  const ctx = pzCanvas.getContext('2d');
+  const W = pzCanvas.width, H = pzCanvas.height;
+  if (!W||!H) return;
+
+  const cx=W/2, cy=H/2, r=Math.min(W,H)*0.38;
+
+  ctx.fillStyle='#14141f'; ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle='#333348'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-r*1.1,cy); ctx.lineTo(cx+r*1.1,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,cy-r*1.1); ctx.lineTo(cx,cy+r*1.1); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle='#555568'; ctx.font='10px sans-serif';
+  ctx.fillText('+1',cx+r+2,cy+12);
+  ctx.fillText('-1',cx-r-22,cy+12);
+  ctx.fillText('+j',cx+3,cy-r-2);
+  ctx.fillText('-j',cx+3,cy+r+12);
+
+  function zx(re) { return cx+re*r; }
+  function zy(im) { return cy-im*r; }
+
+  // Compare
+  for (let i=0;i<4;i++) {
+    const c = state.compare[i]; if(!c) continue;
+    for (const p of c.pz) {
+      const col = COMPARE_COLORS[i]+'88';
+      if (p.pole) drawX(ctx, zx(p.re), zy(p.im), 6, col);
+      else        drawO(ctx, zx(p.re), zy(p.im), 6, col);
+    }
+  }
+
+  // Current
+  for (const p of state.result.pz) {
+    if (p.pole) drawX(ctx, zx(p.re), zy(p.im), 7, '#ff8080');
+    else        drawO(ctx, zx(p.re), zy(p.im), 7, '#8080ff');
+  }
+
+  ctx.strokeStyle='#3a3a50'; ctx.strokeRect(0,0,W,H);
+}
+
+function drawX(ctx,x,y,s,col) {
+  ctx.strokeStyle=col; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(x-s,y-s); ctx.lineTo(x+s,y+s); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+s,y-s); ctx.lineTo(x-s,y+s); ctx.stroke();
+}
+function drawO(ctx,x,y,s,col) {
+  ctx.strokeStyle=col; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x,y,s,0,2*Math.PI); ctx.stroke();
+}
+
+pzCanvas.addEventListener('mousemove', e => {
+  const rect = pzCanvas.getBoundingClientRect();
+  const W=pzCanvas.width, H=pzCanvas.height;
+  const cx=W/2,cy=H/2,r=Math.min(W,H)*0.38;
+  const mx=(e.clientX-rect.left)*W/rect.width;
+  const my=(e.clientY-rect.top)*H/rect.height;
+  const re=(mx-cx)/r, im=(cy-my)/r;
+  let best=null, bestD=0.05;
+  for (const p of state.result.pz) {
+    const d=Math.sqrt((p.re-re)**2+(p.im-im)**2);
+    if (d<bestD) { bestD=d; best=p; }
+  }
+  const tt=document.getElementById('tooltip');
+  if (best) {
+    const mag=Math.sqrt(best.re**2+best.im**2);
+    tt.style.display='block';
+    tt.style.left=(e.clientX+12)+'px'; tt.style.top=(e.clientY-6)+'px';
+    tt.innerHTML=`${best.pole?'Pole':'Zero'}: ${best.re.toFixed(4)}${best.im>=0?'+':''}${best.im.toFixed(4)}j<br>|z|=${mag.toFixed(4)}`;
+  } else { tt.style.display='none'; }
+});
+pzCanvas.addEventListener('mouseleave',()=>document.getElementById('tooltip').style.display='none');
+
+// ── Impulse / Step Plot ───────────────────────────────────────────
+const impulseCanvas = document.getElementById('impulse-canvas');
+let impulseDrag = null;
+
+function drawImpulsePlot() {
+  resizeCanvas(impulseCanvas);
+  const ctx = impulseCanvas.getContext('2d');
+  const W = impulseCanvas.width, H = impulseCanvas.height;
+  if (!W||!H) return;
+
+  const Y_AX=44, X_AX=18;
+  const pw=W-Y_AX, ph=H-X_AX;
+  const px=Y_AX, py=0;
+
+  ctx.fillStyle='#14141f'; ctx.fillRect(0,0,W,H);
+
+  const sig = state.showStep ? state.result.step : state.result.impulse;
+  if (!sig.length) { ctx.strokeStyle='#3a3a50'; ctx.strokeRect(px,py,pw,ph); return; }
+
+  const {lo,hi} = state.impulseZoom;
+  const i0 = Math.max(0, Math.floor(lo*(sig.length-1)));
+  const i1 = Math.min(sig.length-1, Math.ceil(hi*(sig.length-1)));
+  const view = sig.slice(i0, i1+1);
+
+  let mn=Infinity, mx=-Infinity;
+  for (const v of view) { if(isFinite(v)){mn=Math.min(mn,v);mx=Math.max(mx,v);} }
+  if (!isFinite(mn)){mn=0;mx=1;}
+  if (mx-mn<1e-30) { mx=mn+1; }
+
+  function vToY(v) { return py+ph*(1-(v-mn)/(mx-mn)); }
+  function iToX(i) { return px + (i/(view.length-1||1))*pw; }
+
+  // Y grid
+  ctx.fillStyle='#888899'; ctx.font='10px sans-serif';
+  for (const v of niceTicks(mn,mx,5)) {
+    const y=vToY(v); if(y<py-2||y>py+ph+2) continue;
+    ctx.strokeStyle='#333348'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px+pw,y); ctx.stroke();
+    ctx.fillText(v.toFixed(Math.abs(v)<0.01?4:3), 0, y+3);
+  }
+
+  // Zero line
+  if (mn<0&&mx>0) {
+    const y=vToY(0);
+    ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px+pw,y); ctx.stroke();
+  }
+
+  // Signal
+  ctx.strokeStyle = state.showStep ? '#64c8ff' : '#64ff96';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  view.forEach((v,i) => {
+    const x=iToX(i), y=vToY(Math.max(mn-0.01*(mx-mn), Math.min(mx+0.01*(mx-mn),v)));
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // X axis (time)
+  const t0 = i0 / state.rate * 1000;
+  const t1 = i1 / state.rate * 1000;
+  ctx.fillStyle='#888899';
+  for (const t of niceTicks(t0, t1, 5)) {
+    const x = px + (t-t0)/(t1-t0||1)*pw;
+    if (x<px-2||x>px+pw+2) continue;
+    ctx.strokeStyle='#333348'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,py+ph); ctx.lineTo(x,py+ph+4); ctx.stroke();
+    const lbl = t1<2000 ? `${t.toFixed(2)}ms` : `${(t/1000).toFixed(3)}s`;
+    ctx.fillText(lbl, x+2, py+ph+13);
+  }
+
+  ctx.strokeStyle='#3a3a50'; ctx.lineWidth=1;
+  ctx.strokeRect(px,py,pw,ph);
+}
+
+impulseCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect=impulseCanvas.getBoundingClientRect();
+  const tx=(e.clientX-rect.left-44)/(rect.width-44);
+  const {lo,hi}=state.impulseZoom;
+  const cur=lo+tx*(hi-lo);
+  const factor=e.deltaY>0?1.35:1/1.35;
+  let lo2=cur+(lo-cur)*factor, hi2=cur+(hi-cur)*factor;
+  lo2=Math.max(0,lo2); hi2=Math.min(1,hi2);
+  const n=state.nSamples||512;
+  if((hi2-lo2)>=4/n){state.impulseZoom={lo:lo2,hi:hi2};drawImpulsePlot();}
+},{passive:false});
+
+impulseCanvas.addEventListener('pointerdown',e=>{
+  impulseDrag={x:e.clientX,lo:state.impulseZoom.lo,hi:state.impulseZoom.hi};
+  impulseCanvas.setPointerCapture(e.pointerId);
+});
+impulseCanvas.addEventListener('pointermove',e=>{
+  if(!impulseDrag)return;
+  const w=impulseCanvas.getBoundingClientRect().width-44;
+  const dx=e.clientX-impulseDrag.x;
+  const range=impulseDrag.hi-impulseDrag.lo;
+  const shift=-(dx/w)*range;
+  const lo2=impulseDrag.lo+shift, hi2=impulseDrag.hi+shift;
+  if(lo2>=0&&hi2<=1){state.impulseZoom={lo:lo2,hi:hi2};drawImpulsePlot();}
+});
+impulseCanvas.addEventListener('pointerup',()=>impulseDrag=null);
+impulseCanvas.addEventListener('dblclick',()=>{
+  state.impulseZoom={lo:0,hi:1};drawImpulsePlot();
+});
+
+document.getElementById('impulse-reset-zoom').onclick=()=>{
+  state.impulseZoom={lo:0,hi:1};drawImpulsePlot();
+};
+
+// ── Stability ─────────────────────────────────────────────────────
+function updateStability() {
+  const pz=state.result.pz;
+  const poles=pz.filter(p=>p.pole);
+  let maxMag=0, stable=true;
+  for(const p of poles){const m=Math.sqrt(p.re**2+p.im**2);maxMag=Math.max(maxMag,m);if(m>=1)stable=false;}
+
+  const el=document.getElementById('stability-status');
+  el.className = stable?'status-ok':'status-err';
+  el.textContent = stable?'✓ STABLE':'✗ UNSTABLE';
+
+  const fill=document.getElementById('stability-fill');
+  const margin=Math.max(0,1-maxMag);
+  fill.style.width=(margin*100)+'%';
+  fill.style.background=margin>0.1?'#64ff96':'#ff6464';
+
+  document.getElementById('stability-info').textContent =
+    maxMag>0 ? `Max pole magnitude: ${maxMag.toFixed(4)} — margin: ${(1-maxMag).toFixed(4)}` : '';
+
+  const f=FAMILIES[state.family];
+  document.getElementById('stability-warn').textContent=
+    state.order>=8&&!f.fir&&!f.special?`⚠ Order ${state.order}: may cause quantisation instability in fixed-point`:'';
+
+  document.getElementById('order-minus2').style.display=(!stable&&state.order>2)?'':'none';
+}
+
+document.getElementById('order-minus2').onclick=()=>{
+  state.order=Math.max(1,state.order-2);
+  document.getElementById('order').value=state.order;
+  update();
+};
+
+// ── Cascade (SOS) ─────────────────────────────────────────────────
+function updateCascade() {
+  // Parse SOS from pz (approximate — for display only)
+  // In a full implementation we'd get this from the filter directly
+  const tbody=document.getElementById('sos-body');
+  tbody.innerHTML='';
+  const spec=state.result.spec;
+  if(!spec||!state.result.valid) return;
+  try {
+    const code=wasmStr('wasm_generate_code',spec,state.rate,'c99');
+    if(!code) return;
+    // Extract coefficients from generated C code
+    const lines=code.split('\n').filter(l=>l.match(/static const double.*=\s*\{/)||l.match(/^\s+\-?\d/));
+    let stage=0;
+    const re_arr = /static const double\s+\w+\s*\[\s*\d+\s*\]\s*=\s*\{([^}]+)\}/g;
+    let m, arrs=[];
+    while((m=re_arr.exec(code))!==null) arrs.push(m[1].trim().split(',').map(s=>parseFloat(s.trim())));
+    if(arrs.length>=2) {
+      const bs=arrs[0], as=arrs[1];
+      for(let i=0;i<bs.length;i+=3,stage++) {
+        const tr=document.createElement('tr');
+        tr.style.borderBottom='1px solid var(--border)';
+        const b0=bs[i]??0, b1=bs[i+1]??0, b2=bs[i+2]??0;
+        const a1=as[i+1]??0, a2=as[i+2]??0;
+        tr.innerHTML=`<td>${stage+1}</td><td>${b0.toFixed(6)}</td><td>${b1.toFixed(6)}</td><td>${b2.toFixed(6)}</td><td>${a1.toFixed(6)}</td><td>${a2.toFixed(6)}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+  } catch(e){}
+}
+
+// ── Compare A/B ────────────────────────────────────────────────────
+function freezeSlot(i) {
+  if(!state.result.valid) return;
+  state.compare[i]={
+    spec:state.result.spec,
+    freqResp:[...state.result.freqResp],
+    pz:[...state.result.pz],
+    color:COMPARE_COLORS[i],
+  };
+  renderCompare();
+  drawFreqPlot();
+  drawPzPlot();
+}
+
+function renderCompare() {
+  const el=document.getElementById('compare-slots');
+  el.innerHTML='';
+  for(let i=0;i<4;i++) {
+    const c=state.compare[i];
+    const lab='ABCD'[i];
+    const div=document.createElement('div');
+    div.className='compare-slot';
+    div.innerHTML=`<div class="color-dot" style="background:${COMPARE_COLORS[i]}"></div>
+      <span style="font-size:11px;flex:1">${c?`${lab}: ${c.spec}`:lab+': empty'}</span>
+      ${c?`<button onclick="state.compare[${i}]=null;renderCompare();drawFreqPlot();drawPzPlot()">✕</button>`:''}`;
+    el.appendChild(div);
+  }
+}
+
+// ── Export ────────────────────────────────────────────────────────
+function updateExport() {
+  if(!state.result.valid) { document.getElementById('export-code').value=''; return; }
+  const code=wasmStr('wasm_generate_code',state.result.spec,state.rate,state.currentLang)||'// Error';
+  document.getElementById('export-code').value=code;
+}
+
+document.getElementById('lang-tabs').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-lang]'); if(!btn)return;
+  document.querySelectorAll('#lang-tabs [data-lang]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  state.currentLang=btn.dataset.lang;
+  updateExport();
+});
+
+document.getElementById('btn-copy-code').onclick=()=>{
+  navigator.clipboard?.writeText(document.getElementById('export-code').value);
+};
+document.getElementById('btn-download-code').onclick=()=>{
+  const code=document.getElementById('export-code').value;
+  const ext={c99:'c',cpp20:'cpp',python:'py',rust:'rs',matlab:'m',julia:'jl',verilog:'v',systemverilog:'sv'};
+  download(`filter.${ext[state.currentLang]||'txt'}`,code,'text/plain');
+};
+
+// ── Tabs ──────────────────────────────────────────────────────────
+document.getElementById('right-tabs').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-tab]'); if(!btn)return;
+  document.querySelectorAll('#right-tabs [data-tab]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  state.currentTab=btn.dataset.tab;
+  ['stability','cascade','compare','export'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display=t===state.currentTab?'':'none';
+  });
+  if(state.currentTab==='export') updateExport();
+  if(state.currentTab==='cascade') updateCascade();
+});
+
+// ── Render all ────────────────────────────────────────────────────
+function renderAll() {
+  drawFreqPlot(); drawImpulsePlot(); drawPzPlot();
+
+  // Spec display
+  document.getElementById('spec-display').textContent=state.result.spec;
+  const sEl=document.getElementById('spec-status');
+  if(state.result.valid){
+    sEl.className='status-ok'; sEl.textContent='✓ '+state.result.spec;
+  } else {
+    sEl.className='status-err'; sEl.textContent='✗ '+state.result.error;
+  }
+  document.getElementById('spec-raw').value=state.result.spec;
+
+  updateStability();
+  if(state.currentTab==='cascade') updateCascade();
+  if(state.currentTab==='compare') renderCompare();
+  if(state.currentTab==='export')  updateExport();
+}
+
+// ── Parameter Panel wiring ────────────────────────────────────────
+function initParamPanel() {
+  // Family select
+  const famSel=document.getElementById('family');
+  FAMILIES.forEach((f,i)=>famSel.add(new Option(f.name,i)));
+  famSel.value=0;
+  famSel.onchange=()=>{ state.family=+famSel.value; state.rawSpec=''; updateParamVisibility(); update(); };
+
+  // Passband
+  document.getElementById('passband').onchange=e=>{ state.passband=+e.target.value; state.rawSpec=''; update(); };
+
+  // Rate buttons
+  const rateDiv=document.getElementById('rate-btns');
+  for(const {label,rate} of RATE_BTNS) {
+    const b=document.createElement('button');
+    b.textContent=label; b.dataset.rate=rate;
+    b.onclick=()=>{
+      state.rate=rate;
+      clampFreqs();
+      state.rawSpec='';
+      state.freqZoom={lo:1,hi:rate/2};
+      state.impulseZoom={lo:0,hi:1};
+      document.getElementById('rate-input').value=rate;
+      highlightRateBtn();
+      update();
+    };
+    rateDiv.appendChild(b);
+  }
+  document.getElementById('rate-input').value=state.rate;
+  document.getElementById('rate-input').onchange=e=>{
+    const r=Math.min(384000,Math.max(10,+e.target.value));
+    state.rate=r; clampFreqs(); state.rawSpec='';
+    state.freqZoom={lo:1,hi:r/2}; state.impulseZoom={lo:0,hi:1};
+    highlightRateBtn(); update();
+  };
+
+  // ── Order ──────────────────────────────────────────────────────
+  const ordSlider = document.getElementById('order');
+  const ordNum    = document.getElementById('order-num');
+  function setOrder(v) {
+    const maxOrd = FAMILIES[state.family].maxOrder||20;
+    state.order = Math.max(1, Math.min(maxOrd, Math.round(v)));
+    ordSlider.value = state.order;
+    ordNum.value    = state.order;
+    state.rawSpec=''; update();
+  }
+  ordSlider.oninput = e => setOrder(+e.target.value);
+  ordNum.onchange   = e => setOrder(+e.target.value);
+
+  // ── fc1 ────────────────────────────────────────────────────────
+  function setFc1(hz) {
+    const nyq=state.rate/2;
+    state.fc1=Math.max(1, Math.min(nyq*0.9999, hz));
+    if(state.fc1>=state.fc2-1) state.fc2=state.fc1+1;
+    document.getElementById('fc1').value=logNorm(state.fc1,1,nyq-1).toFixed(4);
+    document.getElementById('fc1-num').value=state.fc1.toFixed(2);
+    state.rawSpec=''; update();
+  }
+  document.getElementById('fc1').oninput=e=>{
+    const nyq=state.rate/2;
+    setFc1(logDenorm(+e.target.value, 1, nyq-1));
+  };
+  document.getElementById('fc1-num').onchange=e=>setFc1(+e.target.value);
+
+  // ── fc2 ────────────────────────────────────────────────────────
+  function setFc2(hz) {
+    const nyq=state.rate/2;
+    state.fc2=Math.max(state.fc1+1, Math.min(nyq*0.9999, hz));
+    document.getElementById('fc2').value=logNorm(state.fc2,1,nyq-1).toFixed(4);
+    document.getElementById('fc2-num').value=state.fc2.toFixed(2);
+    state.rawSpec=''; update();
+  }
+  document.getElementById('fc2').oninput=e=>{
+    const nyq=state.rate/2;
+    setFc2(logDenorm(+e.target.value, 1, nyq-1));
+  };
+  document.getElementById('fc2-num').onchange=e=>setFc2(+e.target.value);
+
+  // ── Ripple ─────────────────────────────────────────────────────
+  function setRipple(v) {
+    state.ripple=Math.max(-60, Math.min(-0.001, v));
+    document.getElementById('ripple').value=state.ripple;
+    document.getElementById('ripple-num').value=state.ripple.toFixed(2);
+    state.rawSpec=''; update();
+  }
+  document.getElementById('ripple').oninput=e=>setRipple(+e.target.value);
+  document.getElementById('ripple-num').onchange=e=>setRipple(+e.target.value);
+
+  // ── Q (log slider) ─────────────────────────────────────────────
+  function setQ(v) {
+    state.q=Math.max(0.001, Math.min(200, v));
+    document.getElementById('q-slider').value=Math.log10(state.q).toFixed(4);
+    document.getElementById('q-num').value=state.q.toFixed(4);
+    state.rawSpec=''; update();
+  }
+  document.getElementById('q-slider').oninput=e=>setQ(Math.pow(10,+e.target.value));
+  document.getElementById('q-num').onchange=e=>setQ(+e.target.value);
+
+  // ── Gain ───────────────────────────────────────────────────────
+  function setGain(v) {
+    state.gain=Math.max(-40, Math.min(40, v));
+    document.getElementById('gain').value=state.gain;
+    document.getElementById('gain-num').value=state.gain.toFixed(2);
+    state.rawSpec=''; update();
+  }
+  document.getElementById('gain').oninput=e=>setGain(+e.target.value);
+  document.getElementById('gain-num').onchange=e=>setGain(+e.target.value);
+
+  // Spec raw
+  document.getElementById('spec-raw').addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      state.rawSpec=e.target.value.trim()||'';
+      update();
+    }
+  });
+  document.getElementById('spec-copy').onclick=()=>{
+    navigator.clipboard?.writeText(state.result.spec);
+  };
+
+  // Samples
+  document.getElementById('n-samples').onchange=e=>{
+    state.nSamples=Math.min(4096,Math.max(16,+e.target.value));
+    state.impulseZoom={lo:0,hi:1}; update();
+  };
+
+  // Show phase / cascade / autoy / step
+  document.getElementById('show-phase').onchange=e=>{ state.showPhase=e.target.checked; drawFreqPlot(); };
+  document.getElementById('show-cascade').onchange=e=>{ state.showCascade=e.target.checked; drawFreqPlot(); };
+  document.getElementById('auto-y').onchange=e=>{ state.autoY=e.target.checked; drawFreqPlot(); };
+  document.getElementById('show-step').onchange=e=>{ state.showStep=e.target.checked; drawImpulsePlot(); };
+
+  // Save / Load
+  document.getElementById('btn-save').onclick=saveState;
+  document.getElementById('btn-load-file').onclick=()=>document.getElementById('file-input').click();
+  document.getElementById('file-input').onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=ev=>{ try{loadState(JSON.parse(ev.target.result));}catch{} };
+    r.readAsText(f);
+  };
+
+  // Wizard buttons
+  document.getElementById('btn-wizard').onclick  = openWizard;
+  document.getElementById('btn-wizard2').onclick = openWizard;
+
+  highlightRateBtn();
+  updateParamVisibility();
+  syncSlidersFromState();
+}
+
+function updateParamVisibility() {
+  const f=FAMILIES[state.family];
+  const pb=state.passband;
+  const bpbs=!f.fir&&!f.special&&(pb===2||pb===3);
+
+  document.getElementById('order-row').style.display = (f.special&&f.key==='Re')?'none':'';
+  document.getElementById('fc2-row').style.display   = bpbs?'':'none';
+  document.getElementById('ripple-row').style.display= f.key==='Ch'?'':'none';
+  document.getElementById('q-row').style.display     = f.special?'':'none';
+  document.getElementById('gain-row').style.display  = (state.family===7)?'':'none'; // PeakingEQ
+  document.getElementById('passband').parentElement.style.display=
+    (f.fir||f.special)?'none':'';
+
+  // Bessel max order
+  const maxOrd = f.maxOrder||20;
+  const ordSlider=document.getElementById('order');
+  const ordNum=document.getElementById('order-num');
+  ordSlider.max=maxOrd; ordNum.max=maxOrd;
+  if(state.order>maxOrd){state.order=maxOrd;ordSlider.value=maxOrd;ordNum.value=maxOrd;}
+
+  // fc labels
+  const fc1lbl = bpbs?'Lower cutoff fc1 (Hz)':f.special?'Center frequency (Hz)':'Cutoff fc1 (Hz)';
+  document.getElementById('fc1-label').textContent=fc1lbl;
+
+  // Update fc num limits
+  const nyq2=state.rate/2;
+  document.getElementById('fc1-num').max=nyq2.toFixed(0);
+  document.getElementById('fc2-num').max=nyq2.toFixed(0);
+}
+
+function clampFreqs() {
+  const nyq=state.rate/2;
+  state.fc1=Math.max(1,Math.min(nyq*0.99,state.fc1));
+  state.fc2=Math.max(state.fc1+1,Math.min(nyq*0.99,state.fc2));
+}
+
+function syncSlidersFromState() {
+  const nyq=state.rate/2;
+  document.getElementById('fc1').value=logNorm(state.fc1,1,nyq-1).toFixed(4);
+  document.getElementById('fc2').value=logNorm(state.fc2,1,nyq-1).toFixed(4);
+  document.getElementById('fc1-num').value=state.fc1.toFixed(2);
+  document.getElementById('fc2-num').value=state.fc2.toFixed(2);
+  document.getElementById('order').value=state.order;
+  document.getElementById('order-num').value=state.order;
+  document.getElementById('ripple').value=state.ripple;
+  document.getElementById('ripple-num').value=state.ripple.toFixed(2);
+  document.getElementById('q-slider').value=Math.log10(state.q).toFixed(4);
+  document.getElementById('q-num').value=state.q.toFixed(4);
+  document.getElementById('gain').value=state.gain;
+  document.getElementById('gain-num').value=state.gain.toFixed(2);
+  document.getElementById('family').value=state.family;
+  document.getElementById('passband').value=state.passband;
+  document.getElementById('rate-input').value=state.rate;
+  highlightRateBtn();
+}
+
+function highlightRateBtn() {
+  document.querySelectorAll('#rate-btns button').forEach(b=>{
+    b.classList.toggle('active',+b.dataset.rate===state.rate);
+  });
+}
+
+// ── Persist ───────────────────────────────────────────────────────
+function stateToJSON() {
+  const {family,passband,order,rate,fc1,fc2,ripple,q,gain,rawSpec,nSamples}=state;
+  return JSON.stringify({family,passband,order,rate,fc1,fc2,ripple,q,gain,rawSpec,nSamples},null,2);
+}
+
+function saveState() {
+  const json=stateToJSON();
+  localStorage.setItem('fiview2_state',json);
+  download('fiview2_state.json',json,'application/json');
+}
+
+function loadState(obj) {
+  Object.assign(state, {
+    family:   obj.family  ??state.family,
+    passband: obj.passband??state.passband,
+    order:    obj.order   ??state.order,
+    rate:     obj.rate    ??state.rate,
+    fc1:      obj.fc1     ??state.fc1,
+    fc2:      obj.fc2     ??state.fc2,
+    ripple:   obj.ripple  ??state.ripple,
+    q:        obj.q       ??state.q,
+    gain:     obj.gain    ??state.gain,
+    rawSpec:  obj.rawSpec ??'',
+    nSamples: obj.nSamples??state.nSamples,
+  });
+  state.freqZoom={lo:1,hi:state.rate/2};
+  state.impulseZoom={lo:0,hi:1};
+  syncSlidersFromState();
+  updateParamVisibility();
+  update();
+}
+
+function download(name,content,mime) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=name; a.click();
+}
+
+// URL hash state
+function pushHash() {
+  const {family,passband,order,rate,fc1,fc2,ripple,q,gain}=state;
+  const obj={family,passband,order,rate,fc1,fc2,ripple,q,gain};
+  location.hash=btoa(JSON.stringify(obj));
+}
+
+function loadHash() {
+  try {
+    if(!location.hash||location.hash==='#') return false;
+    const obj=JSON.parse(atob(location.hash.slice(1)));
+    loadState(obj); return true;
+  } catch { return false; }
+}
+
+// ── Guided Wizard ─────────────────────────────────────────────────
+function openWizard() { document.getElementById('wizard-dialog').showModal(); }
+document.getElementById('wiz-cancel').onclick  = ()=>document.getElementById('wizard-dialog').close();
+document.getElementById('wiz-cancel2').onclick = ()=>document.getElementById('wizard-dialog').close();
+document.getElementById('wiz-next').onclick=()=>{
+  const uc=document.querySelector('[name=uc]:checked');
+  if(!uc) return;
+  document.getElementById('wizard-step1').style.display='none';
+  document.getElementById('wizard-step2').style.display='';
+};
+document.getElementById('wiz-back').onclick=()=>{
+  document.getElementById('wizard-step2').style.display='none';
+  document.getElementById('wizard-step1').style.display='';
+};
+document.getElementById('wiz-apply').onclick=()=>{
+  const uc=+document.querySelector('[name=uc]:checked')?.value??0;
+  const wb=+document.querySelector('[name=wb]:checked')?.value??0;
+  const rate=uc===0?44100:uc===2?1000:8000;
+  state.rate=rate; state.family=0; state.passband=0; state.rawSpec='';
+  if(wb===0){state.passband=0;state.order=4;state.fc1=rate/8;}
+  else if(wb===1){state.passband=1;state.order=2;state.fc1=0.5;}
+  else if(wb===2){state.passband=3;state.order=2;state.fc1=48;state.fc2=62;}
+  else{state.passband=1;state.order=2;state.fc1=5;}
+  state.freqZoom={lo:1,hi:rate/2}; state.impulseZoom={lo:0,hi:1};
+  document.getElementById('wizard-dialog').close();
+  syncSlidersFromState(); updateParamVisibility(); update();
+};
+
+// ── ResizeObserver ────────────────────────────────────────────────
+const ro=new ResizeObserver(()=>{drawFreqPlot();drawImpulsePlot();drawPzPlot();});
+ro.observe(document.getElementById('panel-freq'));
+ro.observe(document.getElementById('panel-pz'));
+ro.observe(document.getElementById('panel-impulse'));
+
+// ── Boot ──────────────────────────────────────────────────────────
+function loadingMsg(msg) {
+  document.getElementById('loading').innerHTML =
+    `<div style="text-align:center"><div>${msg}</div></div>`;
+}
+
+async function boot() {
+  try {
+    loadingMsg('Loading WASM…');
+
+    if (typeof FidlibModule === 'undefined') {
+      // Development mode: load external fiview2_wasm.js
+      loadingMsg('Loading fiview2_wasm.js…');
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'fiview2_wasm.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('fiview2_wasm.js not found'));
+        document.head.appendChild(script);
+      });
+    }
+
+    if (typeof FidlibModule === 'undefined')
+      throw new Error('FidlibModule not defined after script load');
+
+    loadingMsg('Initialising WASM module…');
+    const wasmBin = typeof __WASM_BINARY__ !== 'undefined' ? __WASM_BINARY__ : undefined;
+    wasm = await FidlibModule({wasmBinary: wasmBin});
+
+    document.getElementById('loading').style.display='none';
+    initParamPanel();
+    if(!loadHash()){
+      const saved=localStorage.getItem('fiview2_state');
+      if(saved) try{loadState(JSON.parse(saved));}catch{}
+    }
+    update();
+  } catch(err) {
+    loadingMsg(
+      `<b style="color:#ff6464">WASM load failed</b><br><br>` +
+      `<code style="font-size:11px;color:#ffcc44">${err.message||err}</code><br><br>` +
+      `<span style="font-size:11px;color:#888">Open browser console (F12) for details.</span>`
+    );
+    console.error('fiview2 boot error:', err);
+  }
+}
+
+boot();
+</script>
+</body>
+</html>

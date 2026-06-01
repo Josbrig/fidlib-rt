@@ -9,10 +9,12 @@ JamesHight
   Community patches to fidlib: const-correctness, C++ guards, v0.9.11.
   https://github.com/JamesHight/fidlib
 
-Kai Dieki
-  Extensions: SIMD/NEON acceleration, Overlap-Save FFT engine,
-  Vulkan Compute backend, OpenCL backend, cmake modernization,
-  install scripts, manuals (2025–2026).
+Jörg Simbrig <Josbrig@simbrig.de>
+  Extensions to fidlib: SIMD/NEON acceleration, Overlap-Save FFT engine,
+  Vulkan Compute and OpenCL backends, cmake modernisation (2025–2026).
+  New components: fidgen (universal filter code generator, 8 output languages),
+  fiview2 (Dear ImGui GUI workbench), fiview2 WebAssembly browser port,
+  imtile (cockpit layout library), install scripts, manuals.
 
 Acknowledgements
 ----------------

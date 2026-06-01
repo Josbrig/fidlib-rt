@@ -21,7 +21,15 @@ released under the **GNU General Public License version 2**.
 Copyright (C) 2002–2004 Jim Peters <http://uazu.net/>.
 See `COPYING` for the full license text.
 
-Tests, scripts, and build infrastructure follow the same GPL 2.0 terms.
+## fidgen and fiview2 — GPL 2.0 or later
+
+The filter code generator (`fidgen/`), the GUI workbench (`fiview2/`), the
+WebAssembly browser port (`web/`), and the test suite (`tests/`) are released
+under the **GNU General Public License version 2.0 or later**.
+Copyright (C) 2025–2026 Jörg Simbrig.
+See `COPYING` for the full license text.
+
+Build infrastructure and scripts follow the same GPL 2.0-or-later terms.
 
 ## Documentation — CC BY-SA 4.0
 
@@ -29,19 +37,26 @@ The manuals under `manuals/` and documents under `doc/` are released under
 the **Creative Commons Attribution-ShareAlike 4.0 International License**.
 See: https://creativecommons.org/licenses/by-sa/4.0/
 
-## SDL2 (build dependency)
+## Third-party build dependencies
 
-SDL2 is used as an ExternalProject build dependency for fiview.
-SDL2 is released under the **zlib license**.
-See: https://www.libsdl.org/license.php
+| Component | License | Used by |
+|---|---|---|
+| Dear ImGui | MIT | fiview2 (desktop GUI) |
+| GLFW | zlib | fiview2 (OpenGL window) |
+| SDL2 | zlib | fiview (legacy), fiview2 optional audio |
+| nlohmann/json | MIT | fiview2 state serialisation |
+| KissFFT | BSD-3-Clause | fiview2 spectrum analysis |
+| Eigen3 | MPL-2.0 | optional inverse filter design |
+| imtile | GPL-2.0-or-later | fiview2 cockpit layout |
+| FFTW3 (optional) | GPL-2.0-or-later | fidlib overlap-save FFT (`FIDLIB_FFT=ON`) |
+| Vulkan SDK headers (optional) | Apache-2.0 | fidlib GPU backend (`FIDLIB_VULKAN=ON`) |
 
-## FFTW3 (optional build dependency)
+**FFTW3 note:** When `FIDLIB_FFT=ON`, any binary linking fidlib+FFTW3 is subject to
+GPL 2.0 terms. The built-in Radix-2 FFT backend carries no additional restrictions.
 
-When `FIDLIB_FFT=ON` and `libfftw3-dev` is installed, fidlib links against
-FFTW3, which is released under the **GNU General Public License version 2
-or later**. This means any binary that links fidlib+FFTW3 is subject to
-GPL 2.0 terms. The built-in Radix-2 FFT backend (used when FFTW3 is absent)
-carries no additional license restrictions.
+**Vulkan note:** Apache-2.0 is incompatible with GPL-2.0-only. Avoid enabling
+`FIDLIB_VULKAN=ON` in builds that also link `fiview` or `firun` (GPL-2.0-only).
+`FIDLIB_VULKAN=ON` is safe with `fiview2` and `fidgen` (GPL-2.0-or-later).
 
 ## Acknowledgements
 

@@ -81,6 +81,7 @@ This software incorporates third-party components under their respective licence
 | Eigen3 | Various contributors | MPL-2.0 |
 | KissFFT | Mark Borgerding | BSD-3-Clause |
 | imtile | Jörg Simbrig | GPL-2.0-or-later |
+| Emscripten runtime (WASM) | Emscripten contributors | MIT / LLVM |
 
 The original fidlib, fiview, and firun source code is copyright © 2002–2004 Jim Peters
 and is used here under the terms of its respective licences. All modifications and

@@ -9,3 +9,6 @@ fiview.coef
 a.out
 fiview2.ini
 imgui.ini
+vendor/emsdk/
+build-web/
+dist/
