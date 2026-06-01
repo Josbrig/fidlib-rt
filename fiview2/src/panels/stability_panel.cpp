@@ -102,7 +102,7 @@ void draw_guided_mode(FilterState& state)
 {
     if (!g_gs.shown) {
         if (!ImGui::Begin("Guided Mode (Wizard)")) { ImGui::End(); return; }
-        if (ImGui::Button("Open Wizard")) g_gs.step = 1;
+        if (ImGui::Button("Open Wizard")) { g_gs.step = 1; g_gs.shown = true; }
         ImGui::End();
         return;
     }

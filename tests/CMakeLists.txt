@@ -853,3 +853,49 @@ if(BUILD_TOOLS)
   )
   set_tests_properties(firun_sil PROPERTIES LABELS "sil;integration")
 endif()
+
+
+# ── 17. test_fiview2_fuzz ─────────────────────────────────────────────────
+# Randomised stress test for FilterState / recompute_slot.
+# Hammers all FilterFamily × FilterPassband × order combinations with
+# random + edge-case rate/fc values. ASan + UBSan catch any crash.
+
+if(BUILD_FIVIEW2)
+  add_executable(test_fiview2_fuzz
+    test_fiview2_fuzz.cpp
+    ${CMAKE_SOURCE_DIR}/fiview2/src/filter_state.cpp
+  )
+
+  set_property(TARGET test_fiview2_fuzz PROPERTY CXX_STANDARD 20)
+  set_property(TARGET test_fiview2_fuzz PROPERTY CXX_STANDARD_REQUIRED ON)
+  set_property(TARGET test_fiview2_fuzz PROPERTY CXX_EXTENSIONS OFF)
+
+  target_include_directories(test_fiview2_fuzz PRIVATE
+    ${CMAKE_SOURCE_DIR}/fiview2/src   # filter_state.hpp etc.
+  )
+
+  target_link_libraries(test_fiview2_fuzz PRIVATE
+    fidlib
+    fidgen_lib
+  )
+
+  target_compile_options(test_fiview2_fuzz PRIVATE
+    -Wall -Wextra -Wpedantic
+    ${TEST_SANITIZE_FLAGS}
+  )
+
+  if(TEST_SANITIZE_FLAGS)
+    target_link_options(test_fiview2_fuzz PRIVATE ${TEST_SANITIZE_FLAGS})
+  endif()
+
+  set_target_properties(test_fiview2_fuzz PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+  )
+
+  add_test(NAME fiview2_fuzz COMMAND test_fiview2_fuzz)
+  set_tests_properties(fiview2_fuzz PROPERTIES
+    LABELS "fuzz;fiview2"
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+    TIMEOUT 120
+  )
+endif()

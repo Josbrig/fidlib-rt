@@ -5,6 +5,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) — [SemVer](ht
 
 ---
 
+## [0.1.1] — 2026-06-01
+
+### Added
+
+**fiview2**
+- Frequency Response panel: scroll-wheel zoom and drag-pan on the frequency axis;
+  double-click or "Reset Zoom" button to restore full view
+- Impulse / Step Response panel: scroll-wheel zoom and drag-pan on the time axis
+- Impulse / Step Response panel: time axis (ms / s) and amplitude Y-axis with
+  adaptive tick spacing
+- Fuzz test `test_fiview2_fuzz`: 29 000+ probes covering all filter family ×
+  passband × order combinations plus randomised edge cases; registered in ctest
+  (`ctest -L fuzz`)
+
+### Fixed
+
+**fiview2**
+- Crash when switching sample rate to a value lower than the current cutoff
+  frequency (`fc1 > nyq` after rate change — fidlib received a normalised
+  frequency above 0.5)
+- Crash when dragging the lower-cutoff slider above the upper cutoff in BP/BS
+  mode (inverted band passed to fidlib)
+- Crash / silent `exit(1)` for Bessel filters with order > 10 (fidlib hard limit);
+  order slider is now capped at 10 for Bessel
+- Crash for FIR filters with `fc1 = 0` (division by zero in fidlib → `max =
+  INT_MAX` → heap overflow)
+- Silent `exit(1)` when `fc2 ≥ Nyquist` in BP/BS mode
+- Hang / corrupted output for numerically unstable high-order filters (impulse
+  response loop now aborts on non-finite values)
+- NULL dereference in `fid_run_newbuf` when `fid_run_new` returned NULL
+- Guided Mode wizard did not open when clicking "Open Wizard" (`g_gs.shown` was
+  never set to `true`)
+
+---
+
 ## [0.1.0] — 2026-05-31
 
 ### Added
@@ -61,4 +96,5 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) — [SemVer](ht
 - FIDLIB_VULKAN=ON requires Vulkan SDK headers (Apache-2.0); incompatible with GPL-2.0-only
   targets (`fiview`, `firun`) — see `doc/github-strict-ruleset.md §1.3`
 
+[0.1.1]: https://github.com/Josbrig/fidlib-rt/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Josbrig/fidlib-rt/releases/tag/v0.1.0
