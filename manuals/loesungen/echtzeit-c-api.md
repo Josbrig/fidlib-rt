@@ -1,48 +1,48 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
-# Solution: Real-Time Filtering in Your Own C Program
+# Lösung: Echtzeit-Filterung im eigenen C-Programm
 
-## The Problem
+## Das Problem
 
-An application receives audio samples one by one from a callback
-(e.g. JACK, ALSA, PortAudio) and must filter each sample immediately — without
-buffer latency, without malloc in the RT thread, without recompilation on parameter change.
+Eine Anwendung empfängt Audio-Samples sample-by-sample aus einem Callback
+(z.B. JACK, ALSA, PortAudio) und muss jeden Sample sofort filtern — ohne
+Puffer-Latenz, ohne malloc im RT-Thread, ohne Recompile bei Parameteränderung.
 
-**Requirements:**
-- RT-safe: no malloc/free, no lock, no system call in the hot path
-- Filter type and frequency from runtime configuration (e.g. command-line argument)
-- Support for IIR and FIR in the same codebase
-- Multiple independent instances of the same filter (e.g. L + R channel)
-
----
-
-## Which project tools help
-
-- **fidlib three-phase model**: Alloc → Run → Free
-  - `fid_design()` — filter design (not RT-safe, one-time only)
-  - `fid_run_new()` — run object with coefficients (not RT-safe, one-time only)
-  - `fid_run_newbuf()` — state buffer (not RT-safe, one-time only)
-  - `FidFunc *step_fn(buf, sample)` — single-sample processing (**RT-safe**)
-- **`FIDLIB_SIMD=ON`** — NEON/SSE2 vectorisation, automatically active
+**Anforderungen:**
+- RT-sicher: kein malloc/free, kein Lock, kein Systemaufruf im Hot-Path
+- Filter-Typ und Frequenz aus Laufzeit-Konfiguration (z.B. Kommandozeilenargument)
+- Unterstützung für IIR und FIR in derselben Codebasis
+- Mehrere unabhängige Instanzen desselben Filters (z.B. L + R Kanal)
 
 ---
 
-## The three-phase model
+## Welche Mittel des Projekts helfen
+
+- **fidlib drei-Phasen-Modell**: Alloc → Run → Free
+  - `fid_design()` — Filter-Design (nicht RT-safe, nur einmalig)
+  - `fid_run_new()` — Run-Objekt mit Koeffizienten (nicht RT-safe, nur einmalig)
+  - `fid_run_newbuf()` — Zustandspuffer (nicht RT-safe, nur einmalig)
+  - `FidFunc *step_fn(buf, sample)` — Ein-Sample-Verarbeitung (**RT-safe**)
+- **`FIDLIB_SIMD=ON`** — NEON/SSE2-Vektorisierung, automatisch aktiv
+
+---
+
+## Das drei-Phasen-Modell
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  ALLOC PHASE (before the RT thread)                             │
-│  fid_design()   → FidFilter* (poles/zeros, coefficients)       │
-│  fid_run_new()  → Run* (optimised execution plan)              │
-│  fid_run_newbuf() → Buf* (delay lines, state)                  │
-│  free(filt)     → free FidFilter (no longer needed)            │
+│  ALLOC-PHASE (vor dem RT-Thread)                                │
+│  fid_design()   → FidFilter* (Pole/Nullstellen, Koeffizienten) │
+│  fid_run_new()  → Run* (optimierter Ausführungsplan)           │
+│  fid_run_newbuf() → Buf* (Verzögerungsleitungen, Zustand)      │
+│  free(filt)     → FidFilter freigeben (nicht mehr benötigt)    │
 ├─────────────────────────────────────────────────────────────────┤
-│  RUN PHASE (in RT thread, callback)                             │
-│  step_fn(buf, sample) → filtered sample                        │
-│  ← zero-alloc, branch-free, ~ns latency                       │
+│  RUN-PHASE (im RT-Thread, Callback)                             │
+│  step_fn(buf, sample) → gefilterter Sample                     │
+│  ← zero-alloc, branch-arm, ~ns-Latenz                         │
 ├─────────────────────────────────────────────────────────────────┤
-│  FREE PHASE (on shutdown)                                       │
+│  FREE-PHASE (beim Beenden)                                      │
 │  fid_run_freebuf(buf)                                          │
 │  fid_run_free(run)                                             │
 └─────────────────────────────────────────────────────────────────┘
@@ -50,9 +50,9 @@ buffer latency, without malloc in the RT thread, without recompilation on parame
 
 ---
 
-## Step by Step
+## Schritt-für-Schritt
 
-### Step 1: Build the project
+### Schritt 1: Projekt bauen
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -62,7 +62,7 @@ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
 cmake --build build -j$(nproc)
 ```
 
-### Step 2: Minimal program — one filter, one channel
+### Schritt 2: Minimales Programm — ein Filter, ein Kanal
 
 ```c
 // filter_example.c
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // ── Alloc phase ──────────────────────────────────────────────────
+    // ── Alloc-Phase ──────────────────────────────────────────────────
     FidFilter *filt = fid_design(argv[1], 44100.0, -1.0, -1.0, 0, NULL);
     if (!filt) {
         fprintf(stderr, "Ungueltige Filter-Spec: %s\n", argv[1]);
@@ -89,57 +89,57 @@ int main(int argc, char *argv[]) {
     void    *buf = fid_run_newbuf(run);
     free(filt);
 
-    // ── Run phase (RT-safe from here) ─────────────────────────────────
+    // ── Run-Phase (RT-sicher ab hier) ─────────────────────────────────
     double sample;
     while (fread(&sample, sizeof(double), 1, stdin) == 1) {
         double out = step_fn(buf, sample);
         fwrite(&out, sizeof(double), 1, stdout);
     }
 
-    // ── Free phase ───────────────────────────────────────────────────
+    // ── Free-Phase ───────────────────────────────────────────────────
     fid_run_freebuf(buf);
     fid_run_free(run);
     return 0;
 }
 ```
 
-Compile and link:
+Kompilieren und einbinden:
 ```bash
 gcc -o filter_example filter_example.c \
     -I/pfad/zum/projekt/fidlib \
     -L/pfad/zum/projekt/build/fidlib \
     -lfidlib -lm -O2
 
-# Or via cmake target when building the project:
+# Oder beim Build des Projekts via cmake target:
 # target_link_libraries(mein_programm PRIVATE fidlib)
 ```
 
-### Step 3: Stereo — one run object, two buffers
+### Schritt 3: Stereo — ein Run-Objekt, zwei Puffer
 
-The key point: `run` (coefficients) is shared, `buf` is per instance.
+Der wichtigste Aspekt: `run` (Koeffizienten) wird geteilt, `buf` ist pro Instanz.
 
 ```c
-// One filter design for L and R:
+// Ein Filter-Design für L und R:
 FidFilter *filt  = fid_design("LpBu4/4000", 44100.0, -1.0, -1.0, 0, NULL);
 FidFunc   *fn;
 void      *run   = fid_run_new(filt, &fn);
-void      *buf_l = fid_run_newbuf(run);   // state for L channel
-void      *buf_r = fid_run_newbuf(run);   // state for R channel (separate!)
+void      *buf_l = fid_run_newbuf(run);   // Zustand für L-Kanal
+void      *buf_r = fid_run_newbuf(run);   // Zustand für R-Kanal (getrennt!)
 free(filt);
 
-// In the callback:
+// Im Callback:
 double out_l = fn(buf_l, in_l);
 double out_r = fn(buf_r, in_r);
 ```
 
-### Step 4: Change filter at runtime (hot-swap)
+### Schritt 4: Filter zur Laufzeit ändern (Hot-Swap)
 
-Replacing an active filter without RT interruption requires an
-atomic pointer swap. This pattern is possible without a mutex when the new filter
-is fully allocated before the swap:
+Das Austauschen eines aktiven Filters ohne RT-Unterbrechung erfordert einen
+atomaren Zeiger-Swap. Dieses Muster ist ohne Mutex möglich wenn der neue Filter
+vor dem Swap vollständig allokiert ist:
 
 ```c
-// (Simplified — production code needs memory barrier / _Atomic)
+// (Vereinfacht — produktiver Code braucht Memory-Barrier / _Atomic)
 struct ActiveFilter {
     FidFunc *fn;
     void    *run;
@@ -148,35 +148,35 @@ struct ActiveFilter {
 
 struct ActiveFilter *active = create_filter("LpBu4/4000", 44100.0);
 
-// In non-RT thread: allocate new filter:
+// Im Nicht-RT-Thread: neuen Filter allokieren:
 struct ActiveFilter *next = create_filter("LpBu4/2000", 44100.0);
 
-// Atomic swap (simplified here with volatile — production: C11 _Atomic):
+// Atomarer Swap (hier vereinfacht mit volatile — produktiv: C11 _Atomic):
 struct ActiveFilter *old = active;
-active = next;            // pointer swap
+active = next;            // Pointer-Swap
 
-// From this point the RT thread uses next.
-// Free old only when certain no RT thread accesses it anymore.
+// Im RT-Thread ist ab jetzt next aktiv.
+// Old erst freigeben wenn sicher kein RT-Thread mehr darauf zugreift.
 destroy_filter(old);
 ```
 
-### Step 5: Filter reset (set state to zero)
+### Schritt 5: Filter-Reset (Zustand auf Null setzen)
 
-When a filter state should be reset (e.g. after silence):
+Wenn ein Filter-Zustand zurückgesetzt werden soll (z.B. nach Stille):
 
 ```c
-fid_run_zapbuf(buf);   // All delay lines set to 0
+fid_run_zapbuf(buf);   // Alle Verzögerungsleitungen auf 0
 ```
 
 ---
 
-## Multiple filters in series (cascade)
+## Mehrere Filter in Serie (Kaskade)
 
-firun supports filter cascades directly as multiple spec arguments.
-In the C API you cascade manually by passing the output along:
+firun unterstützt Filterkaskaden direkt als mehrere Spec-Argumente.
+In der C-API kaskadiert man manuell durch Weitergabe der Ausgabe:
 
 ```c
-// HP + LP = bandpass (manually cascaded):
+// HP + LP = Bandpass (manuell kaskadiert):
 FidFilter *hp_filt = fid_design("HpBu2/100", 44100.0, -1.0, -1.0, 0, NULL);
 FidFilter *lp_filt = fid_design("LpBu2/3000", 44100.0, -1.0, -1.0, 0, NULL);
 
@@ -189,38 +189,38 @@ void *lp_buf = fid_run_newbuf(lp_run);
 
 free(hp_filt); free(lp_filt);
 
-// In the callback:
+// Im Callback:
 double after_hp  = hp_fn(hp_buf, input);
-double after_lp  = lp_fn(lp_buf, after_hp);   // cascade
+double after_lp  = lp_fn(lp_buf, after_hp);   // Kaskade
 ```
 
 ---
 
-## Typical latencies and throughput (RPi 5, AArch64, NEON)
+## Typische Latenzen und Durchsatz (RPi 5, AArch64, NEON)
 
-| Filter | Order | Type | Latency/sample |
-|--------|-------|------|----------------|
+| Filter | Ordnung | Typ | Latenz/Sample |
+|--------|---------|-----|---------------|
 | `LpBu2/1000` | 2 | IIR | ~10 ns |
 | `LpBu4/1000` | 4 | IIR | ~20 ns |
 | `LpBu8/1000` | 8 | IIR | ~40 ns |
-| Boxcar FIR 64 taps | — | FIR | ~15 ns (NEON) |
-| Boxcar FIR 512 taps | — | FIR | ~60 ns (NEON) |
-| Boxcar FIR 1024 taps (OLA) | — | FIR+FFT | ~8 ns/sample (amortised) |
+| Boxcar FIR 64 Taps | — | FIR | ~15 ns (NEON) |
+| Boxcar FIR 512 Taps | — | FIR | ~60 ns (NEON) |
+| Boxcar FIR 1024 Taps (OLA) | — | FIR+FFT | ~8 ns/Sample (amortisiert) |
 
-IIR: O(order) per sample — scales linearly with filter order.
-FIR > threshold: O(1) amortised thanks to overlap-save.
+IIR: O(order) pro Sample — skaliert linear mit Filterordnung.
+FIR > Threshold: O(1) amortisiert dank Overlap-Save.
 
 ---
 
-## Verification: unit test pattern
+## Verifikation: Unit-Test-Pattern
 
 ```c
-// Test that DC gain is correct (lowpass → gain ≈ 1.0 at f=0):
+// Testen ob DC-Gain korrekt (Tiefpass → Gain ≈ 1.0 bei f=0):
 void *buf = fid_run_newbuf(run);
 fid_run_zapbuf(buf);
 for (int i = 0; i < 10000; i++)
-    fn(buf, 1.0);   // let it settle
+    fn(buf, 1.0);   // Einlaufen lassen
 double dc_gain = fn(buf, 1.0);
-assert(fabs(dc_gain - 1.0) < 0.001);   // tolerance 0.1%
+assert(fabs(dc_gain - 1.0) < 0.001);   // Toleranz 0.1%
 fid_run_freebuf(buf);
 ```

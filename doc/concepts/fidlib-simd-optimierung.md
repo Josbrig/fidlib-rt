@@ -1,70 +1,70 @@
-# SIMD/NEON Optimization for fidlib — Concept and Analysis
+# SIMD/NEON-Optimierung fidlib — Konzept und Analyse
 
-## What is this?
+## Was ist das?
 
-**SIMD** (Single Instruction, Multiple Data) is a CPU extension that processes multiple
-numbers simultaneously with a single machine instruction. On the Raspberry Pi 5
-(ARM Cortex-A76, AArch64), the instruction set is called **NEON** and operates on
-128-bit registers. For `double` (64-bit), exactly two values fit in one NEON register.
+**SIMD** (Single Instruction, Multiple Data) ist eine CPU-Erweiterung, die mit einem
+einzigen Maschinenbefehl mehrere Zahlen gleichzeitig verrechnet. Auf dem Raspberry Pi 5
+(ARM Cortex-A76, AArch64) heißt das Befehlsset **NEON** und arbeitet mit 128-Bit-Registern.
+Für `double` (64-Bit) passen genau zwei Werte in ein NEON-Register.
 
-The central instruction is `vfmaq_f64` — a vectorized fused multiply-add:
+Der zentrale Befehl ist `vfmaq_f64` — eine vektorisierte Fused Multiply-Add:
 
 ```
 acc[0] += coef[0] * data[0]
-acc[1] += coef[1] * data[1]   ← both in ONE clock cycle
+acc[1] += coef[1] * data[1]   ← beides in EINEM Takt
 ```
 
-The implementation also uses **dual accumulation** (two accumulators `acc0`
-and `acc1` alternating), so that with 4 elements per loop iteration, 4 MACs are
-completed in ~2 cycles instead of ~4.
+Die Implementierung nutzt zudem **doppelte Akkumulation** (zwei Akkumulatoren `acc0`
+und `acc1` wechseln sich ab), sodass bei je 4 Elementen pro Schleifenrunde 4 MACs in
+~2 Takten erledigt werden statt in ~4.
 
 ---
 
-## Where is this useful?
+## Wo nützt das?
 
-**Exclusively for long FIR filters** (Finite Impulse Response). An FIR filter of
-length N computes a dot product per output sample:
+**Ausschließlich bei langen FIR-Filtern** (Finite Impulse Response). Ein FIR-Filter der
+Länge N berechnet pro Ausgabesample ein Skalarprodukt:
 
 ```
-y[t] = Σ h[k] · x[t−k]   for k = 0..N−1
+y[t] = Σ h[k] · x[t−k]   für k = 0..N−1
 ```
 
-These are N independent multiplications + additions — the ideal case for SIMD, because
-there is no serial dependency.
+Das sind N unabhängige Multiplikationen + Additionen — der ideale Fall für SIMD, weil
+keine serielle Abhängigkeit besteht.
 
-**Not improved** are recursive IIR filters (Butterworth, Chebyshev, Bessel), since
-their feedback structure enforces a serial dependency:
+**Nicht verbessert** werden rekursive IIR-Filter (Butterworth, Chebyshev, Bessel), da
+deren Rückkopplungsstruktur eine serielle Abhängigkeit erzwingt:
 
 ```
 y[t] = b0·x[t] + b1·x[t−1] − a1·y[t−1] − a2·y[t−2]
 ```
 
-`y[t]` depends on `y[t−1]` → no parallelization across taps is possible.
+`y[t]` hängt von `y[t−1]` ab → keine Parallelisierung über Taps möglich.
 
-**Typical FIR applications** where the optimization takes effect:
+**Typische FIR-Anwendungen** wo die Optimierung wirkt:
 
-- Windowed-sinc lowpass filters (audio resampling, antialiasing)
-- Parks-McClellan equalizers with many taps
-- Bandpass filters with sharp rolloff (> 50 taps)
-- FIR differentiators and Hilbert transformers
+- Windowed-Sinc-Tiefpassfilter (Audio-Resampling, Antialiasing)
+- Parks-McClellan-Equalizer mit vielen Taps
+- Bandpassfilter mit scharfer Flanke (> 50 Taps)
+- FIR-Differenzierer und Hilbert-Transformer
 
 ---
 
-## Where in the code is this implemented?
+## Wo im Code ist das eingebaut?
 
-### `fidlib/fid_simd.h` — Primitive level
+### `fidlib/fid_simd.h` — Primitiv-Ebene
 
-Platform detection at compile time and `fid_fir_dot()`:
+Plattformerkennung zur Compile-Zeit und `fid_fir_dot()`:
 
 ```c
-// Detection
+// Erkennung
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
 #  define FID_SIMD_NEON 1       // AArch64 (Pi 4, Pi 5, Apple M1/M2, ...)
 #elif defined(__SSE2__)
 #  define FID_SIMD_SSE2 1       // x86_64
-// otherwise: scalar C fallback
+// sonst: skalarer C-Fallback
 
-// Core function (NEON variant)
+// Kernfunktion (NEON-Variante)
 static inline double fid_fir_dot(const double *coef, const double *data, int n) {
     float64x2_t acc0 = vdupq_n_f64(0.0);
     float64x2_t acc1 = vdupq_n_f64(0.0);
@@ -72,123 +72,123 @@ static inline double fid_fir_dot(const double *coef, const double *data, int n) 
         acc0 = vfmaq_f64(acc0, vld1q_f64(coef+i),   vld1q_f64(data+i));
         acc1 = vfmaq_f64(acc1, vld1q_f64(coef+i+2), vld1q_f64(data+i+2));
     }
-    // + remaining taps (1–3) scalar
+    // + Rest-Taps (1–3) skalar
 ```
 
-### `fidlib/fidrf_cmdlist.h` — Hot path level
+### `fidlib/fidrf_cmdlist.h` — Hotpath-Ebene
 
-`filter_step()` processes a stream of opcodes. **Opcode 8** covers the case
-of `4N× pure FIR taps` — exactly the long FIR block:
+`filter_step()` verarbeitet einen Befehlsstrom aus Opcodes. **Opcode 8** deckt den Fall
+`4N× reine FIR-Taps` ab — genau der lange FIR-Block:
 
 ```c
-// Scalar path (FIDLIB_SIMD off):
+// Skalarer Pfad (FIDLIB_SIMD aus):
 case 8:
     cnt = *cmd++;
-    do { FIR; FIR; FIR; FIR; } while (--cnt > 0);  // 4 scalar MACs/round
+    do { FIR; FIR; FIR; FIR; } while (--cnt > 0);  // 4 skalare MACs/Runde
 
-// SIMD path (FIDLIB_SIMD on):
+// SIMD-Pfad (FIDLIB_SIMD an):
 case 8: {
     int n = (int)(unsigned char)*cmd++ * 4;
-    buf[-1] = tmp;                         // write sentinel
-    fir += fid_fir_dot(coef, buf-1, n);    // SIMD dot product
-    coef += n;  buf += n;  tmp = buf[-1];  // advance state machine
+    buf[-1] = tmp;                         // Sentinel schreiben
+    fir += fid_fir_dot(coef, buf-1, n);    // SIMD-Dotprodukt
+    coef += n;  buf += n;  tmp = buf[-1];  // State-Maschine weiterschalten
 }
 ```
 
-#### Technical Detail: Sentinel Slot
+#### Technisches Detail: Sentinel-Slot
 
-The delay buffer invariant states: at the time of opcode 8 entry, `buf[-1] == tmp`
-always holds. For the case `j == 0` (opcode 8 is the very first command in the stream,
-which is common for pure FIR filters), `buf[-1]` must be writable.
-For this, `fid_run_newbuf()` reserves an additional `double` before `buf[0]`:
+Der Delay-Buffer-Invariant besagt: zum Zeitpunkt des Opcode-8-Eintritts gilt immer
+`buf[-1] == tmp`. Für den Fall `j == 0` (Opcode 8 ist der allererste Befehl im Stream,
+was bei reinen FIR-Filtern häufig vorkommt) muss `buf[-1]` jedoch beschreibbar sein.
+Dafür reserviert `fid_run_newbuf()` einen zusätzlichen `double` vor `buf[0]`:
 
 ```
-[ RunBuf header | sentinel_double | buf[0..siz-1] | coef[] | cmd[] ]
+[ RunBuf-Header | sentinel_double | buf[0..siz-1] | coef[] | cmd[] ]
                                     ^--- rb->buf
 ```
 
-All buffer management functions were consistently updated:
+Alle Puffer-Verwaltungsfunktionen wurden konsistent angepasst:
 
-| Function | Change |
+| Funktion | Änderung |
 |---|---|
-| `fid_run_newbuf()` | allocates `+1 double`, `rb->buf = alloc+1` |
-| `fid_run_bufsize()` | returns `+sizeof(double)` |
-| `fid_run_initbuf()` | identical layout with `memset(base, 0, buf_bytes)` |
-| `fid_run_zapbuf()` | additionally zeros `buf[-1]` |
+| `fid_run_newbuf()` | `+1 double` allokiert, `rb->buf = alloc+1` |
+| `fid_run_bufsize()` | gibt `+sizeof(double)` zurück |
+| `fid_run_initbuf()` | identisches Layout mit `memset(base, 0, buf_bytes)` |
+| `fid_run_zapbuf()` | nullt zusätzlich `buf[-1]` |
 
-### `fidlib/CMakeLists.txt` — Build level
+### `fidlib/CMakeLists.txt` — Build-Ebene
 
 ```cmake
-option(FIDLIB_SIMD "SIMD acceleration for the FIR hot path" OFF)
+option(FIDLIB_SIMD "SIMD-Beschleunigung für den FIR-Hotpath" OFF)
 if(FIDLIB_SIMD)
     target_compile_definitions(fidlib PUBLIC FIDLIB_SIMD)
-    if(aarch64)  → NEON is always available, no extra flag needed
+    if(aarch64)  → NEON ist immer vorhanden, kein Extra-Flag nötig
     if(x86_64)   → -msse2
 ```
 
-`PUBLIC` ensures that test code and all consumer targets automatically
-receive `FIDLIB_SIMD`.
+`PUBLIC` sorgt dafür dass auch Testcode und alle Abnehmer-Targets automatisch
+`FIDLIB_SIMD` erhalten.
 
 ---
 
-## Performance Improvement
+## Geschwindigkeitsverbesserung
 
-### Theoretical Analysis (Cortex-A76, Raspberry Pi 5)
+### Theoretische Analyse (Cortex-A76, Raspberry Pi 5)
 
-| Metric | Scalar | NEON (dual-acc) | Factor |
+| Metrik | Skalar | NEON (dual-acc) | Faktor |
 |---|---|---|---|
-| MACs per cycle (compute) | 1 | 4 (2× `vfmaq_f64` parallel) | **4×** |
-| Practical (with memory, loop overhead) | — | — | **1.8×–3×** |
+| MACs pro Takt (Compute) | 1 | 4 (2× `vfmaq_f64` parallel) | **4×** |
+| Praktisch (mit Memory, Loop-Overhead) | — | — | **1,8×–3×** |
 
-The Cortex-A76 has two floating-point pipelines that execute `vfmaq_f64` with
-throughput 1/cycle. Dual accumulation (`acc0`/`acc1` alternating) hides the
-4-cycle latency and keeps both pipes busy → ~4 MACs per cycle.
+Der Cortex-A76 hat zwei Floating-Point-Pipelines, die `vfmaq_f64` mit Durchsatz 1/Takt
+ausführen. Die doppelte Akkumulation (`acc0`/`acc1` alternierend) versteckt die 4-Takt-
+Latenz und hält beide Pipes beschäftigt → ~4 MACs pro Takt.
 
-### Scaled by Filter Length
+### Hochrechnung nach Filter-Länge
 
-| FIR taps N | Scalar cycles | NEON cycles | Speed-up |
+| FIR-Taps N | Skalare Takte | NEON-Takte | Speed-up |
 |---|---|---|---|
-| 16 | ~16 | ~8 | **1.8×** |
-| 64 | ~64 | ~22 | **2.9×** |
-| 256 | ~256 | ~70 | **3.7×** |
-| 1024 | ~1024 | ~268 | **3.8×** |
+| 16 | ~16 | ~8 | **1,8×** |
+| 64 | ~64 | ~22 | **2,9×** |
+| 256 | ~256 | ~70 | **3,7×** |
+| 1024 | ~1024 | ~268 | **3,8×** |
 
-Values are estimates for cache-resident access. Memory-bound filters (delay line
-does not fit in L1/L2) converge to ~2×, as memory bandwidth becomes the bottleneck.
+Werte sind Schätzwerte für cache-residenten Zugriff. Memory-bound-Filter (Delay-Line
+passt nicht in L1/L2) konvergieren gegen ~2×, da dann der Speicherdurchsatz limitiert.
 
-### What is NOT faster
+### Was NICHT schneller wird
 
-| Filter type | Opcode | SIMD effect |
+| Filtertyp | Opcode | SIMD-Effekt |
 |---|---|---|
-| IIR biquad (Butterworth / Chebyshev / Bessel) | 18, 21 | **0 %** |
-| IIR only (pole-only) | 16, 19 | **0 %** |
-| Short FIR < 8 taps | 5, 6, 7 | **0 %** (ENDFIR path) |
-| Long FIR ≥ 12 taps | **8** | **1.8×–3.8×** |
+| IIR-Biquad (Butterworth / Chebyshev / Bessel) | 18, 21 | **0 %** |
+| IIR-only (Pol-only) | 16, 19 | **0 %** |
+| Kurze FIR < 8 Taps | 5, 6, 7 | **0 %** (ENDFIR-Pfad) |
+| Lange FIR ≥ 12 Taps | **8** | **1,8×–3,8×** |
 
-By far the most common filter type in this project (Butterworth LP/HP via `LpBu`/`HpBu`)
-uses IIR and benefits **not at all**. The optimization only pays off when FIR filters
-are specifically used with `fid_cv_array` or a Parks-McClellan designer.
+Der bei weitem häufigste Filtertyp in diesem Projekt (Butterworth LP/HP via `LpBu`/`HpBu`)
+verwendet IIR und profitiert **gar nicht**. Die Optimierung zahlt sich erst aus wenn gezielt
+FIR-Filter mit `fid_cv_array` oder einem Parks-McClellan-Designer eingesetzt werden.
 
 ---
 
-## Activation
+## Aktivierung
 
-All three performance options have been **ON by default since 2026-05-28**:
+Alle drei Performance-Optionen sind **seit 2026-05-28 standardmäßig ON**:
 
-| cmake option | Default | Effect |
+| cmake-Option | Default | Wirkung |
 |---|---|---|
-| `FIDLIB_SIMD` | **ON** | NEON / SSE2 FIR dot product |
-| `FIDLIB_FAST_MATH` | **ON** | `-O3 -ffast-math` scoped to fidlib |
-| `FIDLIB_LTO` | **ON** | Link-time optimization on filter_step |
+| `FIDLIB_SIMD` | **ON** | NEON / SSE2 FIR-Dotprodukt |
+| `FIDLIB_FAST_MATH` | **ON** | `-O3 -ffast-math` scoped auf fidlib |
+| `FIDLIB_LTO` | **ON** | Link-Time Optimization auf filter_step |
 
-A normal build therefore automatically activates all optimizations:
+Ein normaler Build aktiviert also automatisch alle Optimierungen:
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -S . -B build_release
 cmake --build build_release -j$(nproc)
 ```
 
-To disable individual stages:
+Zum Deaktivieren einzelner Stufen:
 
 ```bash
 cmake ... -DFIDLIB_SIMD=OFF -DFIDLIB_FAST_MATH=OFF -DFIDLIB_LTO=OFF
@@ -196,7 +196,7 @@ cmake ... -DFIDLIB_SIMD=OFF -DFIDLIB_FAST_MATH=OFF -DFIDLIB_LTO=OFF
 
 ---
 
-## Related Concepts
+## Verwandte Konzepte
 
-- `doc/concepts/fidlib-cpp20-rt-optimierung.md` — RT safety, cache layout
-- `doc/concepts/fidlib-rt-todo.md` — original optimization roadmap
+- `doc/concepts/fidlib-cpp20-rt-optimierung.md` — RT-Sicherheit, Cache-Layout
+- `doc/concepts/fidlib-rt-todo.md` — ursprüngliche Optimierungs-Roadmap

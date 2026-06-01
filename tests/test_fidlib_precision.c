@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2025-2026 Kai Dieki
+// Copyright (C) 2025-2026 Jörg Simbrig
 /*
  * test_fidlib_precision.c — FP32 vs. FP64 precision comparison
  *
- * Verifies that:
- *   1. FIR filter (boxcar 32-tap) in the current precision mode produces
- *      correct results (tolerance depends on FID_REAL).
- *   2. IIR filter (Butterworth LP 4th order) remains stable in the current
- *      mode and shows plausible attenuation (stability check).
+ * Checks that:
+ *   1. FIR filter (32-tap Boxcar) in current precision mode produces correct
+ *      Ergebnisse liefert (Toleranz je nach FID_REAL).
+ *   2. IIR-Filter (Butterworth LP 4. Ordnung) im aktuellen Modus stabil
+ *      remains stable and shows plausible attenuation (stability check).
  *   3. The precision mode is correctly detected and reported.
  *
- * FP64 build: tolerance 1e-12 for FIR.
- * FP32 build: tolerance 1e-5 for FIR (FP32 has ~7 decimal digits).
+ * In FP64 build: tolerance 1e-12 for FIR.
+ * In FP32 build: tolerance 1e-5 for FIR (FP32 has ~7 decimal digits).
  */
 
 #include <stdio.h>
@@ -48,17 +48,17 @@ chk_range(const char *lbl, double got, double lo, double hi)
     return 1;
 }
 
-/* ── 1. FIR precision test: 32-tap boxcar ──────────────────────────────── */
+/* ── 1. FIR precision test: 32-tap Boxcar ──────────────────────────────── */
 
 static void
 test_fir_precision(void)
 {
 #ifdef FIDLIB_PRECISION_F32
-    const double TOL = 1e-5;   /* FP32: ~7 decimal digits */
-    printf("Mode: FP32 (float)  — tolerance %.0e\n\n", TOL);
+    const double TOL = 1e-5;   /* FP32: ~7 Dezimalstellen */
+    printf("Modus: FP32 (float)  — Toleranz %.0e\n\n", TOL);
 #else
-    const double TOL = 1e-12;  /* FP64: ~15 decimal digits */
-    printf("Mode: FP64 (double) — tolerance %.0e\n\n", TOL);
+    const double TOL = 1e-12;  /* FP64: ~15 Dezimalstellen */
+    printf("Modus: FP64 (double) — Toleranz %.0e\n\n", TOL);
 #endif
 
     const int N = 32;
@@ -75,7 +75,7 @@ test_fir_precision(void)
     void      *run = fid_run_new(ff, &fn);
     void      *buf = fid_run_newbuf(run);
 
-    /* impulse at t=0: expect N outputs of w, then 0 */
+    /* Impuls bei t=0: erwarte N Ausgaben von w, dann 0 */
     char label[64];
     for (int t = 0; t < N; t++) {
         double in  = (t == 0) ? 1.0 : 0.0;
@@ -94,18 +94,18 @@ test_fir_precision(void)
     free(ff);
 }
 
-/* ── 2. IIR stability test: Butterworth LP 4th order ───────────────────── */
+/* ── 2. IIR stability test: Butterworth LP 4th order ────────────────────── */
 
 static void
 test_iir_stability(void)
 {
-    /* LpBu4 at 1000 Hz, sample rate 44100 Hz */
+    /* LpBu4 bei 1000 Hz, Abtastrate 44100 Hz */
     FidFilter *ff  = fid_design("LpBu4/1000", 44100.0, -1.0, -1.0, 0, NULL);
     FidFunc   *fn  = NULL;
     void      *run = fid_run_new(ff, &fn);
     void      *buf = fid_run_newbuf(run);
 
-    /* impulse response: 2000 samples; finite energy, no divergence */
+    /* Impulsantwort: 2000 Samples; Energie endlich, kein Divergenz */
     double energy   = 0.0;
     double peak_late = 0.0;   /* max |out| nach Sample 500 */
     int    exploded  = 0;
@@ -132,7 +132,7 @@ test_iir_stability(void)
     free(ff);
 }
 
-/* ── 3. Passband test: DC and Nyquist ───────────────────────────────────── */
+/* ── 3. Sinus-Durchlasstest: DC und Nyquist ─────────────────────────────── */
 
 static void
 test_fir_dc_nyquist(void)
@@ -143,7 +143,7 @@ test_fir_dc_nyquist(void)
     const double TOL = 1e-10;
 #endif
 
-    /* 16-tap boxcar: DC gain = 1, Nyquist gain = 0 for even N */
+    /* 16-tap Boxcar: DC gain = 1, Nyquist gain = 0 for even N */
     const int N = 16;
     const double w = 1.0 / (double)N;
 
@@ -158,12 +158,12 @@ test_fir_dc_nyquist(void)
     void      *run = fid_run_new(ff, &fn);
     void      *buf = fid_run_newbuf(run);
 
-    /* DC: feed 200 samples with in=1.0, last output should be 1.0 */
+    /* DC: pumpe 200 Samples mit in=1.0, letzter Output soll 1.0 sein */
     double dc_out = 0.0;
     for (int t = 0; t < 200; t++) dc_out = fn(buf, 1.0);
     chk_near("boxcar16 DC gain", dc_out, 1.0, TOL);
 
-    /* Nyquist (alternating +1/-1): output should be ~0 */
+    /* Nyquist (alternierend +1/-1): Output soll ~0 sein */
     fid_run_zapbuf(buf);
     double nyq_out = 0.0;
     for (int t = 0; t < 200; t++) nyq_out = fn(buf, (t % 2 == 0) ? 1.0 : -1.0);
@@ -178,7 +178,7 @@ test_fir_dc_nyquist(void)
 
 int main(void)
 {
-    printf("=== FIR precision test (32-tap boxcar) ===\n");
+    printf("=== FIR precision test (32-tap Boxcar) ===\n");
     test_fir_precision();
     printf("\n");
 
@@ -186,7 +186,7 @@ int main(void)
     test_iir_stability();
     printf("\n");
 
-    printf("=== FIR DC/Nyquist test (16-tap boxcar) ===\n");
+    printf("=== FIR DC/Nyquist-Test (16-tap Boxcar) ===\n");
     test_fir_dc_nyquist();
     printf("\n");
 

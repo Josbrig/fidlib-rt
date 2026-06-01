@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2025-2026 Kai Dieki
-# install-deps-raspi5.sh — Dependencies for Raspberry Pi 5
+# install-deps-raspi5.sh — Abhängigkeiten für Raspberry Pi 5
 #
-# Target platform:  RPi 5, Raspberry Pi OS Bookworm (aarch64)
-# GPU capabilities: VideoCore VII (V3D 7.1) — Vulkan 1.2 natively via Mesa V3DV
-#                   OpenCL GPU: only with self-built Mesa Rusticl
+# Zielplattform:  RPi 5, Raspberry Pi OS Bookworm (aarch64)
+# GPU-Fähigkeiten: VideoCore VII (V3D 7.1) — Vulkan 1.2 nativ via Mesa V3DV
+#                  OpenCL GPU: nur mit selbst gebautem Mesa Rusticl
 #
-# Enabled features after installation:
-#   FIDLIB_SIMD=ON      NEON (AArch64, always available)
-#   FIDLIB_FFT=ON       Overlap-Save (built-in Radix-2 or FFTW3)
+# Aktivierte Features nach Installation:
+#   FIDLIB_SIMD=ON      NEON (AArch64, immer verfügbar)
+#   FIDLIB_FFT=ON       Overlap-Save (built-in Radix-2 oder FFTW3)
 #   FIDLIB_VULKAN=ON    Vulkan 1.2 Compute via V3D 7.1 (FP32)
-#   FIDLIB_OPENCL=OFF   RPi5 default: Clover has 0 GPU devices
-#                       (ON only after self-built Mesa Rusticl)
+#   FIDLIB_OPENCL=OFF   RPi5-Standard: Clover hat 0 GPU-Devices
+#                       (ON nur nach Mesa-Rusticl-Eigenbau)
 #
-# Usage: bash scripts/install-deps-raspi5.sh
+# Aufruf: bash scripts/install-deps-raspi5.sh
 
 set -euo pipefail
 
@@ -25,58 +25,58 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 sect()  { echo -e "\n${CYAN}${BOLD}── $* ──${NC}"; }
 
-# ── Platform check ───────────────────────────────────────────────────────────
+# ── Plattform-Prüfung ────────────────────────────────────────────────────────
 ARCH=$(uname -m)
 if [[ "$ARCH" != "aarch64" ]]; then
-    warn "This script is for aarch64 (RPi 5) — current architecture: $ARCH"
-    warn "Continue anyway?"
-    read -rp "[y/N] " C; [[ "${C,,}" == "y" ]] || exit 1
+    warn "Dieses Skript ist für aarch64 (RPi 5) — aktuelle Architektur: $ARCH"
+    warn "Trotzdem fortfahren?"
+    read -rp "[j/N] " C; [[ "${C,,}" == "j" ]] || exit 1
 fi
 
 if ! grep -qi "raspberry" /proc/cpuinfo 2>/dev/null &&
    ! grep -qi "BCM2712"   /proc/cpuinfo 2>/dev/null; then
-    warn "No BCM2712 SoC detected — not a Raspberry Pi 5?"
+    warn "Kein BCM2712-SoC erkannt — kein Raspberry Pi 5?"
 fi
 
-# ── Check aptitude ───────────────────────────────────────────────────────────
+# ── aptitude prüfen ──────────────────────────────────────────────────────────
 if ! command -v aptitude &>/dev/null; then
-    error "aptitude not found: sudo apt-get install aptitude"
+    error "aptitude nicht gefunden: sudo apt-get install aptitude"
     exit 1
 fi
 [[ $EUID -ne 0 ]] && SUDO=sudo || SUDO=
 
-# ── Packages ─────────────────────────────────────────────────────────────────
-sect "Package list"
+# ── Pakete ───────────────────────────────────────────────────────────────────
+sect "Paketliste"
 
 BUILD=(
     build-essential     # gcc, g++, make
-    cmake               # >= 3.16 required
+    cmake               # >= 3.16 erforderlich
     git
     pkg-config
 )
 
-SDL2=(                  # SDL2 source build (ExternalProject_Add)
+SDL2=(                  # SDL2-Quell-Build (ExternalProject_Add)
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev
     libxi-dev libxinerama-dev libxxf86vm-dev
     libgl1-mesa-dev libasound2-dev libpulse-dev
 )
 
 FFT=(
-    libfftw3-dev        # FIDLIB_FFT FFTW3 backend (optional, faster than Radix-2)
+    libfftw3-dev        # FIDLIB_FFT FFTW3-Backend (optional, schneller als Radix-2)
 )
 
 VULKAN=(
-    libvulkan-dev       # Vulkan headers + ICD loader (V3D 7.1 → Vulkan 1.2)
-    glslang-tools       # glslangValidator: GLSL → SPIR-V for fir_dot.comp
-    spirv-tools         # spirv-dis / spirv-val (optional, diagnostics)
-    vulkan-tools        # vulkaninfo — check GPU capabilities
+    libvulkan-dev       # Vulkan-Header + ICD-Loader (V3D 7.1 → Vulkan 1.2)
+    glslang-tools       # glslangValidator: GLSL → SPIR-V für fir_dot.comp
+    spirv-tools         # spirv-dis / spirv-val (optional, Diagnose)
+    vulkan-tools        # vulkaninfo — GPU-Capabilities prüfen
 )
 
 OPENCL=(
-    opencl-headers      # for #include <CL/opencl.h> (compile-time)
-    ocl-icd-opencl-dev  # ICD loader + libOpenCL.so
-    mesa-opencl-icd     # Clover: 0 GPU devices on RPi5, but CPU path testable
-    clinfo              # OpenCL diagnostics
+    opencl-headers      # für #include <CL/opencl.h> (compile-time)
+    ocl-icd-opencl-dev  # ICD-Loader + libOpenCL.so
+    mesa-opencl-icd     # Clover: 0 GPU-Devices auf RPi5, aber CPU-Pfad testbar
+    clinfo              # OpenCL-Diagnose
 )
 
 DOC=(
@@ -88,23 +88,23 @@ ALL=( "${BUILD[@]}" "${SDL2[@]}" "${FFT[@]}" "${VULKAN[@]}" "${OPENCL[@]}" "${DO
 
 printf '  %s\n' "${ALL[@]}"
 
-warn "OpenCL GPU note: Clover (mesa-opencl-icd) provides no GPU devices on RPi5."
-warn "  For real OpenCL GPU support: build Mesa Rusticl from source."
-warn "  Vulkan (V3D 7.1) works out of the box — recommended GPU path."
+warn "OpenCL GPU-Hinweis: Clover (mesa-opencl-icd) liefert auf RPi5 keine GPU-Devices."
+warn "  Für echten OpenCL-GPU-Support: Mesa Rusticl aus Quellcode bauen."
+warn "  Vulkan (V3D 7.1) funktioniert sofort — empfohlener GPU-Pfad."
 
-# ── Simulate + confirmation ───────────────────────────────────────────────────
+# ── Simulate + Bestätigung ───────────────────────────────────────────────────
 sect "Simulation"
 $SUDO aptitude install --simulate -y "${ALL[@]}"
 echo
-read -rp "Proceed with installation? [y/N] " CONFIRM
-[[ "${CONFIRM,,}" == "y" ]] || { warn "Aborted."; exit 0; }
+read -rp "Installation durchführen? [j/N] " CONFIRM
+[[ "${CONFIRM,,}" == "j" ]] || { warn "Abgebrochen."; exit 0; }
 
-# ── Install ───────────────────────────────────────────────────────────────────
+# ── Installieren ─────────────────────────────────────────────────────────────
 sect "Installation"
 $SUDO aptitude install -y "${ALL[@]}"
 
-# ── Versions ──────────────────────────────────────────────────────────────────
-sect "Installed versions"
+# ── Versionen ────────────────────────────────────────────────────────────────
+sect "Installierte Versionen"
 cmake --version               | head -1
 gcc   --version               | head -1
 glslangValidator --version 2>/dev/null | head -1 || true
@@ -112,10 +112,10 @@ pkg-config --modversion fftw3 2>/dev/null | sed 's/^/fftw3: /' || true
 vulkaninfo --summary 2>/dev/null \
     | grep -E "deviceName|apiVersion" | head -4 || true
 
-# ── cmake configuration ───────────────────────────────────────────────────────
-sect "Recommended cmake configuration"
+# ── cmake-Konfiguration ──────────────────────────────────────────────────────
+sect "Empfohlene cmake-Konfiguration"
 cat <<'EOF'
-  # Full RPi5 build (NEON + FFT + Vulkan):
+  # Vollständiger RPi5-Build (NEON + FFT + Vulkan):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON \
         -DFIDLIB_FFT=ON \
@@ -131,6 +131,6 @@ cat <<'EOF'
   cmake --build build_bench --target bench_fir_backends -j$(nproc)
   ./build_bench/bin/bench_fir_backends
 
-  # OpenCL GPU (only after self-built Mesa Rusticl):
+  # OpenCL GPU (nur nach Mesa-Rusticl-Eigenbau):
   # cmake ... -DFIDLIB_OPENCL=ON ...
 EOF

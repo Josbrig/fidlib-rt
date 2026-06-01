@@ -12,7 +12,7 @@ See `COPYING_LIB` for the full license text.
 New extensions to fidlib (`fid_fft.h`, `fid_vulkan.h`, `fid_opencl.h`,
 `fid_simd.h`, `fir_dot.comp`, `fir_dot.cl`, `spv_to_header.cmake`) are
 released under the same license:
-Copyright (C) 2025–2026 Kai Dieki.
+Copyright (C) 2025–2026 Jörg Simbrig.
 
 ## fiview and firun — GPL 2.0
 

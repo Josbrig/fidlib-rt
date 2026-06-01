@@ -828,11 +828,7 @@ z2fidfilter(double gain, int cbm) {
 static void
 bandpass_res(double freq, double qfact) {
    double mag;
-   double th0, th1, th2;
    double theta= freq * TWOPI;
-   double val[2];
-   double tmp1[2], tmp2[2], tmp3[2], tmp4[2];
-   int cnt;
 
    n_pol= 2;
    poltyp[0]= 2; poltyp[1]= 0;
@@ -845,37 +841,24 @@ bandpass_res(double freq, double qfact) {
       return;
    }
 
-   // Do a full binary search, rather than seeding it as Tony Fisher does
-   cexpj(val, theta);
    mag= exp(-theta / (2.0 * qfact));
-   th0= 0; th2= M_PI;
-   for (cnt= 60; cnt > 0; cnt--) {
-      th1= 0.5 * (th0 + th2);
-      cexpj(pol, th1);
+
+   /* Analytic solution: Im[H(e^{iθ})] = 0  ↔  cos(φ) = cos(θ)(1+r²)/(2r)
+      where r = mag, φ = pole angle.  This replaces the original binary search
+      which failed to converge for high frequencies (θ > ~0.8 rad) and low Q. */
+   {
+      double cos_phi = cos(theta) * (1.0 + mag * mag) / (2.0 * mag);
+      double phi;
+      if (fabs(cos_phi) <= 1.0) {
+         phi = acos(cos_phi);
+      } else {
+         /* No exact solution exists (over-damped / near-Nyquist limit):
+            place the pole at the centre-frequency angle. */
+         phi = theta;
+      }
+      cexpj(pol, phi);
       cmulr(pol, mag);
-      
-      // Evaluate response of filter for Z= val
-      memcpy(tmp1, val, 2*sizeof(double));
-      memcpy(tmp2, val, 2*sizeof(double));
-      memcpy(tmp3, val, 2*sizeof(double));
-      memcpy(tmp4, val, 2*sizeof(double));
-      csubz(tmp1, 1, 0);
-      csubz(tmp2, -1, 0);
-      cmul(tmp1, tmp2);
-      csub(tmp3, pol); cconj(pol);
-      csub(tmp4, pol); cconj(pol);
-      cmul(tmp3, tmp4);
-      cdiv(tmp1, tmp3);
-      
-      if (fabs(tmp1[1] / tmp1[0]) < 1e-10) break;
-
-      //printf("%-24.16g%-24.16g -> %-24.16g%-24.16g\n", th0, th2, tmp1[0], tmp1[1]);
-
-      if (tmp1[1] > 0.0) th2= th1;
-      else th0= th1;
    }
-
-   if (cnt <= 0) fprintf(stderr, "Resonator binary search failed to converge");
 }
 
 /**

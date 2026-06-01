@@ -196,7 +196,7 @@ grabFP(char **pp, double *rv) {
 static void
 filter_load_part(char **txtp, char *txt, const char *fnam, int *cntp) {
    Filter *ff;
-   char *p, *q, *prev;
+   char *p, *q, *prev= txt;
    char buf[80];
    int typ, cnt, a, first, lin;
    double tmp;
@@ -314,7 +314,6 @@ filter_load_part(char **txtp, char *txt, const char *fnam, int *cntp) {
    return;
 
  syntax:
-   prev= txt;
    lin= 1;
    for (q= txt; q<p; q++) {
       if (*q == '\n') {
@@ -525,7 +524,7 @@ filter_setup_cnt(Filter *ff) {
    double tot1= 0, tot2= 0;
    int cnt;
    double max_resp, resp, impmin, impmax;
-   int max_resp_cnt = 0;
+   int max_resp_cnt= 0;
    double target;
    double val;
 
@@ -2039,7 +2038,7 @@ do_filter_test(Filter *filt, int ftmod, double ftarg, double freq0, double freq1
 	 // pitch to be at frequency 'freq' at the 50% point.
 	 int cnt= filt->cnt999 + 5;	// extra five is to help with very short FIRs
 	 double f0= freq - ftarg * (cnt - filt->cnt50);
-	 double out[2] = {0.0, 0.0};
+	 double out[2]= {0.0, 0.0};
 	 double osc[2];
 	 double inc[2];
 	 double incinc[2];

@@ -1,69 +1,69 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
-# Solution: Bandpass Filtering for Bio- and Measurement Signals
+# Lösung: Bandpass-Filterung für Bio- und Messsignale
 
-## The Problem
+## Das Problem
 
-An EEG device (or similar biosignal sensor) delivers data at a 250 Hz sample rate.
-The frequency band of interest lies between 8 Hz and 30 Hz (alpha + beta waves).
-Mains hum at 50 Hz and DC offset (drift) should be suppressed.
+Ein EEG-Gerät (oder ähnlicher Biosignal-Sensor) liefert Daten mit 250 Hz Sample-Rate.
+Das interessante Frequenzband liegt zwischen 8 Hz und 30 Hz (Alpha + Beta-Wellen).
+Netzbrumm bei 50 Hz und Gleichanteile (DC-Drift) sollen unterdrückt werden.
 
-**Requirements:**
-- Passband: 8–30 Hz
-- Stopband attenuation below 5 Hz and above 45 Hz
-- Linear phase response in the passband desired (Bessel) or steepest rolloff (Butterworth)
-- Real-time capable at 250 Hz sample rate (not CPU-critical)
-- Multi-channel capable: 8 EEG channels in parallel
-
----
-
-## Which project tools help
-
-- **`BpBu4/8-30`** — Butterworth bandpass 4th order, passband 8–30 Hz
-- **`BpBe4/8-30`** — Bessel bandpass (linear phase response, better for biosignals)
-- **fidlib C API** — one `buf` instance per channel
-- **firun** — multi-channel processing with multiple filter specs
+**Anforderungen:**
+- Durchlassband: 8–30 Hz
+- Sperrbandunterdrückung unterhalb 5 Hz und oberhalb 45 Hz
+- Linearer Phasengang im Durchlassband erwünscht (Bessel) oder steilste Flanke (Butterworth)
+- Echtzeit-fähig bei 250 Hz Sample-Rate (unkritisch für die CPU)
+- Mehrkanal-fähig: 8 EEG-Kanäle parallel
 
 ---
 
-## Step by Step — Variant A: Command line with firun
+## Welche Mittel des Projekts helfen
 
-### Step 1: Understand the filter specification
+- **`BpBu4/8-30`** — Butterworth-Bandpass 4. Ordnung, Passband 8–30 Hz
+- **`BpBe4/8-30`** — Bessel-Bandpass (linearer Phasengang, besser für Biosignale)
+- **fidlib C-API** — eine `buf`-Instanz pro Kanal
+- **firun** — Mehrkanalverarbeitung mit mehreren Filter-Specs
+
+---
+
+## Schritt-für-Schritt — Variante A: Kommandozeile mit firun
+
+### Schritt 1: Filter-Spezifikation verstehen
 
 ```
 BpBu4/8-30
-│  │ │  └── Upper corner frequency: 30 Hz
-│  │ └──── Lower corner frequency: 8 Hz
+│  │ │  └── Obere Eckfrequenz: 30 Hz
+│  │ └──── Untere Eckfrequenz: 8 Hz
 │  └──── Bu = Butterworth
 └──── Bp = Bandpass
 ```
 
-A 4th-order Butterworth bandpass with two-sided corner frequencies has
-8 poles internally (2 per order × 2 sides). The transfer function is the product of two
-Butterworth lowpasses after bilinear transformation.
+Ein Butterworth-Bandpass 4. Ordnung mit zweiseitigen Eckfrequenzen hat intern
+8 Pole (2 pro Ordnung × 2 Seiten). Die Transferfunktion ist das Produkt zweier
+Butterworth-Tiefpässe nach bilinearer Transformation.
 
-### Step 2: Single-channel test with synthetic input
+### Schritt 2: Einzelkanal-Test mit synthetischer Eingabe
 
 ```bash
-# Step response: must decay to 0 in the passband (no DC component):
+# Stufenantwortt: muss im Passband auf 0 abklingen (kein DC-Anteil):
 build/bin/firun -d 500 250 %S BpBu4/8-30 | tail -10
 
-# Sine response at 15 Hz (in passband — must be nearly unity gain):
-# (Not directly testable in firun; use C program or Python)
+# Sinusantwort bei 15 Hz (im Passband — muss nahezu unverstärkt sein):
+# (Nicht direkt in firun testbar; via C-Programm oder Python)
 ```
 
-### Step 3: Filter raw data from one EEG channel
+### Schritt 3: Rohdaten eines EEG-Kanals filtern
 
-ASCII format (one value per line, voltage values as float):
+ASCII-Format (ein Wert pro Zeile, Volt-Werte als Float):
 
 ```bash
 cat kanal1.txt | build/bin/firun 250 a BpBu4/8-30 > kanal1_gefiltert.txt
 ```
 
-### Step 4: 8 channels in parallel (interleaved format)
+### Schritt 4: 8 Kanäle parallel (interleaved Format)
 
-Assumption: the raw data is stored as 8× signed 16-bit per frame (interleaved):
+Annahme: die Rohdaten sind als 8× Signed-16-Bit pro Frame gespeichert (interleaved):
 
 ```bash
 cat eeg_8kanal.raw | \
@@ -73,25 +73,25 @@ cat eeg_8kanal.raw | \
     > eeg_8kanal_gefiltert.raw
 ```
 
-The format `s8` means: 8 signed 16-bit values per frame.
-Each filter spec filters exactly one channel.
+Das Format `s8` bedeutet: 8 Signed-16-Bit-Werte pro Frame.
+Jede Filter-Spec filtert genau einen Kanal.
 
-### Step 5: Filter cascade (highpass + lowpass = bandpass)
+### Schritt 5: Filter-Kaskade (Hochpass + Tiefpass = Bandpass)
 
-Alternatively a bandpass can be realised as a cascade of HP + LP.
-This is numerically more stable at extreme frequency ratios:
+Alternativ kann man Bandpass als Kaskade aus HP + LP realisieren.
+Das ist bei extremen Frequenzverhältnissen numerisch stabiler:
 
 ```bash
-# Equivalent to BpBu2/8-30, but explicitly as a cascade:
+# Äquivalent zu BpBu2/8-30, aber explizit als Kaskade:
 cat signal.txt | \
     build/bin/firun 250 a HpBu2/8 LpBu2/30 > gefiltert.txt
 ```
 
 ---
 
-## Step by Step — Variant B: C API for 8 channels
+## Schritt-für-Schritt — Variante B: C-API für 8 Kanäle
 
-### Alloc phase (once at startup)
+### Alloc-Phase (einmalig beim Start)
 
 ```c
 #include <fidlib/fidlib.h>
@@ -103,7 +103,7 @@ FidFilter *filt = fid_design("BpBu4/8-30", 250.0, -1.0, -1.0, 0, NULL);
 FidFunc   *step_fn;
 void      *run = fid_run_new(filt, &step_fn);
 
-// One state buffer per channel — state is completely separate
+// Ein Zustandspuffer pro Kanal — Zustand ist vollständig getrennt
 void *buf[N_CHANNELS];
 for (int ch = 0; ch < N_CHANNELS; ch++)
     buf[ch] = fid_run_newbuf(run);
@@ -111,7 +111,7 @@ for (int ch = 0; ch < N_CHANNELS; ch++)
 free(filt);
 ```
 
-### Run phase (for each frame with 8 samples)
+### Run-Phase (für jeden Frame mit 8 Samples)
 
 ```c
 void process_frame(double frame_in[8], double frame_out[8]) {
@@ -120,11 +120,12 @@ void process_frame(double frame_in[8], double frame_out[8]) {
 }
 ```
 
-Each channel has its own state buffer — `run` (coefficients) is shared,
-`buf[ch]` holds the filter state (delay lines) per channel. This is
-memory-efficient and thread-safe when each thread gets its own `buf` instances.
+Jeder Kanal hat seinen eigenen Zustandspuffer — `run` (Koeffizienten) wird
+gemeinsam genutzt, `buf[ch]` enthält den Filter-Zustand (Verzögerungsleitungen)
+pro Kanal. Das ist speichereffizient und Thread-sicher wenn jeder Thread
+eigene `buf`-Instanzen bekommt.
 
-### Free phase
+### Free-Phase
 
 ```c
 for (int ch = 0; ch < N_CHANNELS; ch++)
@@ -134,22 +135,22 @@ fid_run_free(run);
 
 ---
 
-## Filter variants for biosignals
+## Filter-Varianten für Biosignale
 
-| Requirement | Fispec | Order | Comment |
+| Anforderung | Fispec | Ordnung | Kommentar |
 |---|---|---|---|
-| Broad alpha+beta | `BpBu4/8-30` | 4 | Standard, steep rolloff |
-| Linear phase response | `BpBe4/8-30` | 4 | Bessel — no phase distortion |
-| Alpha only (8–13 Hz) | `BpBu4/8-13` | 4 | Narrower band |
-| Beta only (13–30 Hz) | `BpBu4/13-30` | 4 | |
-| Delta band (0.5–4 Hz) | `BpBu4/0.5-4` | 4 | Note: close to Nyquist lower bound |
-| Suppress mains hum | `BsBu2/49-51` | 2 | Band-stop / notch 50 Hz |
-| DC removal | `HpBu2/0.5` | 2 | Highpass removes DC drift |
+| Breites Alpha+Beta | `BpBu4/8-30` | 4 | Standard, schnelle Flanken |
+| Linearer Phasengang | `BpBe4/8-30` | 4 | Bessel — keine Phasenverzerrung |
+| Nur Alpha (8–13 Hz) | `BpBu4/8-13` | 4 | Engeres Band |
+| Nur Beta (13–30 Hz) | `BpBu4/13-30` | 4 | |
+| Delta-Band (0.5–4 Hz) | `BpBu4/0.5-4` | 4 | Achtung: nah an Nyquist-Untergrenze |
+| Netzbrumm unterdrücken | `BsBu2/49-51` | 2 | Band-Stop / Notch 50 Hz |
+| DC-Entfernung | `HpBu2/0.5` | 2 | Hochpass entfernt DC-Drift |
 
-### Typical cascade for EEG preprocessing
+### Typische Kaskade für EEG-Vorverarbeitung
 
 ```bash
-# DC removal → bandpass → notch:
+# DC-Entfernung → Bandpass → Notch:
 cat kanal.txt | \
     build/bin/firun 250 a \
         HpBu2/0.5 \
@@ -158,18 +159,18 @@ cat kanal.txt | \
     > kanal_vorverarbeitet.txt
 ```
 
-In the C API: three separate `fid_run_new` objects, three `buf` instances,
-output of the first is input to the second.
+In der C-API: drei separate `fid_run_new`-Objekte, drei `buf`-Instanzen,
+Ausgabe des ersten ist Eingabe des zweiten.
 
 ---
 
-## Analyse frequency response (without external tool)
+## Frequenzantwort analysieren (ohne externes Tool)
 
 ```bash
-# Output impulse response and compute FFT with Python/gnuplot:
+# Impulsantwort ausgeben und mit Python/gnuplot FFT machen:
 build/bin/firun -d 2048 250 %I BpBu4/8-30 > impulse_bp.dat
 
-# With Python (numpy/scipy):
+# Mit Python (numpy/scipy):
 python3 - << 'EOF'
 import numpy as np
 import matplotlib.pyplot as plt
@@ -187,13 +188,13 @@ EOF
 
 ---
 
-## Verification
+## Verifikation
 
 ```bash
-# DC suppression: step response must approach 0 over time:
+# DC-Unterdrückung: Stufenantwortt muss langfristig auf 0 gehen:
 build/bin/firun -d 1000 250 %S BpBu4/8-30 | tail -5
-# Expected: values close to 0.0
+# Erwartung: Werte nahe 0.0
 
-# Impulse response: must decay after a finite time:
+# Impulsantwort: muss nach endlicher Zeit abklingen:
 build/bin/firun -d 500 250 %I BpBu4/8-30 | awk '{sum+=($1<0?-$1:$1)} END{print "Energie:",sum}'
 ```

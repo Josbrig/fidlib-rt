@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2025-2026 Kai Dieki
-# install-deps-raspi4.sh — Dependencies for Raspberry Pi 4
+# install-deps-raspi4.sh — Abhängigkeiten für Raspberry Pi 4
 #
-# Target platform:  RPi 4, Raspberry Pi OS Bookworm (aarch64)
-# GPU capabilities: VideoCore VI (V3D 4.2)
-#   Vulkan:  experimental via Mesa V3DV (Vulkan 1.0/1.1, no Compute in Mesa < 23.1)
-#   OpenCL:  not supported (Clover/Rusticl: no V3D-6 driver)
+# Zielplattform:  RPi 4, Raspberry Pi OS Bookworm (aarch64)
+# GPU-Fähigkeiten: VideoCore VI (V3D 4.2)
+#   Vulkan:  experimentell via Mesa V3DV (Vulkan 1.0/1.1, kein Compute in Mesa < 23.1)
+#   OpenCL:  nicht unterstützt (Clover/Rusticl: kein V3D-6-Treiber)
 #
-# Enabled features after installation:
-#   FIDLIB_SIMD=ON      NEON (AArch64, always available)
-#   FIDLIB_FFT=ON       Overlap-Save (built-in Radix-2 or FFTW3)
-#   FIDLIB_VULKAN=OFF   V3D 4.2 has no Vulkan compute shader support
-#                       (Compute requires Vulkan 1.1 + computeShader = VK_TRUE)
-#   FIDLIB_OPENCL=OFF   No working OpenCL driver for V3D 4.2
+# Aktivierte Features nach Installation:
+#   FIDLIB_SIMD=ON      NEON (AArch64, immer verfügbar)
+#   FIDLIB_FFT=ON       Overlap-Save (built-in Radix-2 oder FFTW3)
+#   FIDLIB_VULKAN=OFF   V3D 4.2 hat keinen Vulkan-Compute-Shader-Support
+#                       (Compute benötigt Vulkan 1.1 + computeShader = VK_TRUE)
+#   FIDLIB_OPENCL=OFF   Kein funktionierender OpenCL-Treiber für V3D 4.2
 #
-# Usage: bash scripts/install-deps-raspi4.sh
+# Aufruf: bash scripts/install-deps-raspi4.sh
 
 set -euo pipefail
 
@@ -26,44 +26,44 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 sect()  { echo -e "\n${CYAN}${BOLD}── $* ──${NC}"; }
 
-# ── Platform check ───────────────────────────────────────────────────────────
+# ── Plattform-Prüfung ────────────────────────────────────────────────────────
 ARCH=$(uname -m)
 if [[ "$ARCH" != "aarch64" ]]; then
-    warn "This script is for aarch64 (RPi 4) — current architecture: $ARCH"
-    warn "Continue anyway?"
-    read -rp "[y/N] " C; [[ "${C,,}" == "y" ]] || exit 1
+    warn "Dieses Skript ist für aarch64 (RPi 4) — aktuelle Architektur: $ARCH"
+    warn "Trotzdem fortfahren?"
+    read -rp "[j/N] " C; [[ "${C,,}" == "j" ]] || exit 1
 fi
 
 if ! grep -qi "raspberry" /proc/cpuinfo 2>/dev/null &&
    ! grep -qi "BCM2711"   /proc/cpuinfo 2>/dev/null; then
-    warn "No BCM2711 SoC detected — not a Raspberry Pi 4?"
+    warn "Kein BCM2711-SoC erkannt — kein Raspberry Pi 4?"
 fi
 
-# ── Check aptitude ───────────────────────────────────────────────────────────
+# ── aptitude prüfen ──────────────────────────────────────────────────────────
 if ! command -v aptitude &>/dev/null; then
-    error "aptitude not found: sudo apt-get install aptitude"
+    error "aptitude nicht gefunden: sudo apt-get install aptitude"
     exit 1
 fi
 [[ $EUID -ne 0 ]] && SUDO=sudo || SUDO=
 
-# ── Packages ─────────────────────────────────────────────────────────────────
-sect "Package list"
+# ── Pakete ───────────────────────────────────────────────────────────────────
+sect "Paketliste"
 
 BUILD=(
     build-essential     # gcc, g++, make
-    cmake               # >= 3.16 required
+    cmake               # >= 3.16 erforderlich
     git
     pkg-config
 )
 
-SDL2=(                  # SDL2 source build (ExternalProject_Add)
+SDL2=(                  # SDL2-Quell-Build (ExternalProject_Add)
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev
     libxi-dev libxinerama-dev libxxf86vm-dev
     libgl1-mesa-dev libasound2-dev libpulse-dev
 )
 
 FFT=(
-    libfftw3-dev        # FIDLIB_FFT FFTW3 backend (optional, faster than Radix-2)
+    libfftw3-dev        # FIDLIB_FFT FFTW3-Backend (optional, schneller als Radix-2)
 )
 
 DOC=(
@@ -75,32 +75,32 @@ ALL=( "${BUILD[@]}" "${SDL2[@]}" "${FFT[@]}" "${DOC[@]}" )
 
 printf '  %s\n' "${ALL[@]}"
 
-warn "GPU note: RPi 4 (VideoCore VI / V3D 4.2) has no Vulkan compute support."
-warn "  Vulkan rendering (Graphics) works partially from Mesa 21 onwards,"
-warn "  but Vulkan Compute Shaders (VkComputePipeline) are not available."
-warn "  Recommendation: NEON-SIMD + Overlap-Save FFT is the optimal path on RPi 4."
+warn "GPU-Hinweis: RPi 4 (VideoCore VI / V3D 4.2) hat keinen Vulkan-Compute-Support."
+warn "  Vulkan-Rendering (Graphics) funktioniert ab Mesa 21 teilweise,"
+warn "  aber Vulkan Compute Shader (VkComputePipeline) ist nicht verfügbar."
+warn "  Empfehlung: NEON-SIMD + Overlap-Save FFT ist der optimale Pfad auf RPi 4."
 
-# ── Simulate + confirmation ───────────────────────────────────────────────────
+# ── Simulate + Bestätigung ───────────────────────────────────────────────────
 sect "Simulation"
 $SUDO aptitude install --simulate -y "${ALL[@]}"
 echo
-read -rp "Proceed with installation? [y/N] " CONFIRM
-[[ "${CONFIRM,,}" == "y" ]] || { warn "Aborted."; exit 0; }
+read -rp "Installation durchführen? [j/N] " CONFIRM
+[[ "${CONFIRM,,}" == "j" ]] || { warn "Abgebrochen."; exit 0; }
 
-# ── Install ───────────────────────────────────────────────────────────────────
+# ── Installieren ─────────────────────────────────────────────────────────────
 sect "Installation"
 $SUDO aptitude install -y "${ALL[@]}"
 
-# ── Versions ──────────────────────────────────────────────────────────────────
-sect "Installed versions"
+# ── Versionen ────────────────────────────────────────────────────────────────
+sect "Installierte Versionen"
 cmake --version               | head -1
 gcc   --version               | head -1
 pkg-config --modversion fftw3 2>/dev/null | sed 's/^/fftw3: /' || true
 
-# ── cmake configuration ───────────────────────────────────────────────────────
-sect "Recommended cmake configuration"
+# ── cmake-Konfiguration ──────────────────────────────────────────────────────
+sect "Empfohlene cmake-Konfiguration"
 cat <<'EOF'
-  # Standard RPi 4 build (NEON + FFT — no GPU compute):
+  # Standard-Build RPi 4 (NEON + FFT — kein GPU-Compute):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON \
         -DFIDLIB_FFT=ON \
@@ -115,6 +115,6 @@ cat <<'EOF'
   cmake --build build_bench --target bench_fir_backends -j$(nproc)
   ./build_bench/bin/bench_fir_backends
 
-  # FIDLIB_VULKAN=ON and FIDLIB_OPENCL=ON are not useful on RPi 4.
-  # For GPU compute: use RPi 5 (VideoCore VII, Vulkan 1.2) or desktop.
+  # FIDLIB_VULKAN=ON und FIDLIB_OPENCL=ON sind auf RPi 4 nicht sinnvoll.
+  # Für GPU-Compute: RPi 5 (VideoCore VII, Vulkan 1.2) oder Desktop verwenden.
 EOF

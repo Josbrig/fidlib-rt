@@ -1,53 +1,53 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
-# Solution: GPU-Accelerated FIR Filtering via Vulkan (Raspberry Pi 5)
+# Lösung: GPU-beschleunigte FIR-Filterung via Vulkan (Raspberry Pi 5)
 
-## The Problem
+## Das Problem
 
-A very long FIR filter (4096 taps, e.g. a room impulse response / convolution reverb)
-is to be processed in real time on the Raspberry Pi 5. Even the
-overlap-save FFT engine hits CPU limits with very long filters.
-The VideoCore VII (V3D 7.1) of the RPi 5 supports Vulkan 1.2 with compute shaders —
-the GPU core should take over the parallel convolution.
+Ein sehr langer FIR-Filter (4096 Taps, z.B. Raumimpulsantwort / Faltungshall)
+soll auf dem Raspberry Pi 5 in Echtzeit verarbeitet werden. Selbst die
+Overlap-Save-FFT-Engine stößt bei sehr langen Filtern an CPU-Grenzen.
+Der VideoCore VII (V3D 7.1) des RPi 5 unterstützt Vulkan 1.2 mit Compute Shaders —
+der GPU-Kern soll die parallele Faltung übernehmen.
 
-**Requirements:**
-- FIR filter with ≥ 256 taps offloaded to GPU
-- Vulkan 1.2 Compute via Mesa V3DV (no proprietary driver)
-- Transparent fallback: if GPU unavailable → OLA/FFT or NEON
-- No API difference compared to CPU filtering
-
----
-
-## Which project tools help
-
-- **`FIDLIB_VULKAN=ON`** — activates the Vulkan compute backend in `fid_vulkan.h`
-- **`fir_dot.comp`** — GLSL compute shader (64 threads, FP32)
-- **`FIDLIB_VULKAN_THRESHOLD`** — above this tap count the GPU is preferred (default: 256)
-- **`FIDLIB_VULKAN_BATCH`** — number of samples per dispatch (default: 256)
-- **`spv_to_header.cmake`** — shader is compiled to SPIR-V at build time and
-  embedded as a C array; no external shader file needed at runtime
+**Anforderungen:**
+- FIR-Filter mit ≥ 256 Taps auf GPU auslagern
+- Vulkan 1.2 Compute via Mesa V3DV (kein proprietärer Treiber)
+- Transparenter Fallback: falls GPU nicht verfügbar → OLA/FFT oder NEON
+- Kein API-Unterschied zur CPU-Filterung
 
 ---
 
-## Step 1: Install dependencies
+## Welche Mittel des Projekts helfen
+
+- **`FIDLIB_VULKAN=ON`** — aktiviert Vulkan-Compute-Backend in `fid_vulkan.h`
+- **`fir_dot.comp`** — GLSL Compute Shader (64 Threads, FP32)
+- **`FIDLIB_VULKAN_THRESHOLD`** — ab dieser Tap-Anzahl wird GPU bevorzugt (Standard: 256)
+- **`FIDLIB_VULKAN_BATCH`** — Anzahl Samples pro Dispatch (Standard: 256)
+- **`spv_to_header.cmake`** — Shader wird beim Build zu SPIR-V kompiliert und
+  als C-Array eingebettet; keine externe Shader-Datei zur Laufzeit nötig
+
+---
+
+## Schritt 1: Abhängigkeiten installieren
 
 ```bash
 sudo aptitude install libvulkan-dev glslang-tools spirv-tools vulkan-tools
 
-# Check whether V3D 7.1 is found:
+# Prüfen ob V3D 7.1 gefunden wird:
 vulkaninfo --summary
-# Expected: deviceName = V3D 7.1, apiVersion = 1.2.xxx, deviceType = INTEGRATED_GPU
+# Erwartet: deviceName = V3D 7.1, apiVersion = 1.2.xxx, deviceType = INTEGRATED_GPU
 ```
 
-If `vulkaninfo` shows no GPU:
+Falls `vulkaninfo` keine GPU zeigt:
 ```bash
-# Activate Mesa V3DV (should be active automatically in Bookworm):
+# Mesa V3DV aktivieren (sollte in Bookworm automatisch aktiv sein):
 ls /usr/share/vulkan/icd.d/
-# Expected: broadcom_icd.aarch64.json or similar
+# Erwartet: broadcom_icd.aarch64.json oder ähnlich
 ```
 
-## Step 2: cmake build with Vulkan
+## Schritt 2: cmake-Build mit Vulkan
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -59,96 +59,96 @@ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
 cmake --build build_vk -j$(nproc)
 ```
 
-cmake output (relevant lines):
+cmake-Ausgabe (relevante Zeilen):
 ```
--- Compiling fir_dot.comp → SPIR-V
--- Embedding SPIR-V as C array → fir_dot_spv.h
+-- Kompiliere fir_dot.comp → SPIR-V
+-- Bette SPIR-V als C-Array ein → fir_dot_spv.h
 -- fidlib VULKAN: Vulkan 1.2.xxx, Batch=256, Threshold=256
 ```
 
-If cmake disables `FIDLIB_VULKAN`:
+Falls cmake `FIDLIB_VULKAN` deaktiviert:
 ```
--- WARNING: fidlib VULKAN: no GLSL compiler (glslc/glslangValidator) found
+-- WARNING: fidlib VULKAN: kein GLSL-Compiler (glslc/glslangValidator) gefunden
 ```
-→ `sudo aptitude install glslang-tools` and rerun cmake.
+→ `sudo aptitude install glslang-tools` und cmake neu.
 
-## Step 3: Understand Vulkan initialisation
+## Schritt 3: Vulkan-Initialisierung verstehen
 
-The Vulkan engine initialises **lazily** on the first `fid_run_new` call
-with a FIR filter ≥ threshold. If no GPU is found or the Vulkan init fails,
-`fid_run_new` automatically falls back to OLA/FFT:
+Die Vulkan-Engine initialisiert sich **lazy** beim ersten `fid_run_new`-Aufruf
+mit einem FIR-Filter ≥ Threshold. Falls die GPU nicht gefunden wird oder der
+Vulkan-Init fehlschlägt, fällt `fid_run_new` automatisch auf OLA/FFT zurück:
 
 ```
-fid_run_new(filt, &fn) is called
-    → tap count ≥ FIDLIB_VULKAN_THRESHOLD?
-    → vk_init() (once): VkInstance → PhysicalDevice → Device → Queue
-    → no device found → returns NULL → next stage (OLA/FFT)
+fid_run_new(filt, &fn) wird aufgerufen
+    → Tap-Anzahl ≥ FIDLIB_VULKAN_THRESHOLD?
+    → vk_init() (einmalig): VkInstance → PhysicalDevice → Device → Queue
+    → Findet kein Gerät → gibt NULL zurück → nächste Stufe (OLA/FFT)
 ```
 
-## Step 4: Program unchanged — same API
+## Schritt 4: Programm unverändert — gleiche API
 
 ```c
 #include <fidlib/fidlib.h>
 #include <stdlib.h>
 
-// Exactly the same API as without Vulkan:
+// Exakt dieselbe API wie ohne Vulkan:
 FidFilter *filt = fid_design("...", 44100.0, -1.0, -1.0, 0, NULL);
-// filt must be a FIR filter with ≥ 256 taps — e.g. via fid_cv_array
+// Hier muss filt ein FIR-Filter mit ≥ 256 Taps sein — z.B. via fid_cv_array
 
 FidFunc *step_fn;
 void    *run = fid_run_new(filt, &step_fn);
-// ^ Automatically selects: OpenCL → Vulkan → OLA → Scalar
+// ^ Wählt automatisch: OpenCL → Vulkan → OLA → Scalar
 
 void *buf = fid_run_newbuf(run);
 free(filt);
 
-// RT phase:
+// RT-Phase:
 double out = step_fn(buf, input_sample);
-// ^ Internally: samples are buffered; at B samples → GPU dispatch → output
+// ^ Intern: Samples werden gebuffert, bei B Samples → GPU-Dispatch → Ausgabe
 
 // Cleanup:
 fid_run_freebuf(buf);
 fid_run_free(run);
 ```
 
-## Step 5: Understand the batch mechanism
+## Schritt 5: Batch-Mechanismus verstehen
 
-The Vulkan backend collects samples in a host buffer until `FIDLIB_VULKAN_BATCH`
-samples are available, then:
+Das Vulkan-Backend sammelt Samples im Host-Buffer bis `FIDLIB_VULKAN_BATCH`
+Samples vorliegen, dann:
 
-1. Coefficients + input buffer → GPU VRAM (host-visible buffer, unified memory)
-2. Compute dispatch: `ceil(B/64)` workgroups, 64 threads each → parallel FIR convolution
-3. `vkQueueWaitIdle` — wait until GPU is done
-4. Read output buffer from GPU → deliver sample by sample
+1. Koeffizienten + Eingabepuffer → GPU-VRAM (Host-Visible Buffer, unified memory)
+2. Compute Dispatch: `ceil(B/64)` Workgroups, 64 Threads je → parallele FIR-Faltung
+3. `vkQueueWaitIdle` — warten bis GPU fertig
+4. Ausgabepuffer von GPU lesen → Sample-by-Sample weiterliefern
 
-Output only arrives after `FIDLIB_VULKAN_BATCH` input samples (= batch latency).
-With Batch=256 and 44100 Hz: ~5.8 ms latency.
+Die Ausgabe kommt erst nach `FIDLIB_VULKAN_BATCH` Eingabe-Samples (= Batch-Latenz).
+Bei Batch=256 und 44100 Hz: ~5.8 ms Latenz.
 
-**Adjust batch size:**
+**Batch-Größe anpassen:**
 ```bash
-# Larger batches → less dispatch overhead, more latency:
+# Größere Batches → weniger Dispatch-Overhead, mehr Latenz:
 cmake ... -DFIDLIB_VULKAN_BATCH=1024 ...
 
-# Smaller batches → less latency, more overhead:
+# Kleinere Batches → weniger Latenz, mehr Overhead:
 cmake ... -DFIDLIB_VULKAN_BATCH=64 ...
 ```
 
-## Step 6: Control dispatch priority
+## Schritt 6: Dispatch-Priorität kontrollieren
 
-When both `FIDLIB_VULKAN=ON` and `FIDLIB_OPENCL=ON` and `FIDLIB_FFT=ON`:
+Wenn sowohl `FIDLIB_VULKAN=ON` als auch `FIDLIB_OPENCL=ON` und `FIDLIB_FFT=ON`:
 
 ```
-OpenCL (highest priority) → Vulkan → OLA/FFT → NEON/Scalar
+OpenCL (höchste Priorität) → Vulkan → OLA/FFT → NEON/Scalar
 ```
 
-Vulkan without OpenCL:
+Vulkan ohne OpenCL:
 ```bash
 cmake ... -DFIDLIB_VULKAN=ON -DFIDLIB_OPENCL=OFF ...
 ```
 
-Then Vulkan is the first GPU option.
+Dann ist Vulkan die erste GPU-Option.
 
-## Step 7: Benchmark — CPU vs. GPU
+## Schritt 7: Benchmark — CPU vs. GPU
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -159,31 +159,31 @@ cmake --build build_bench --target bench_fir_backends -j$(nproc)
 ./build_bench/bin/bench_fir_backends
 ```
 
-CSV output contains `backend` column: `scalar`, `neon`, `ola_fftw3`, `vulkan`.
+CSV-Ausgabe enthält `backend`-Spalte: `scalar`, `neon`, `ola_fftw3`, `vulkan`.
 
-## Step 8: Run tests
+## Schritt 8: Test ausführen
 
 ```bash
 ctest --test-dir build_vk -R fidlib_vulkan --output-on-failure
 ```
 
-The test checks the correctness of the Vulkan backend against direct convolution.
-If no GPU is found it skips itself with `SKIP`.
+Der Test prüft Korrektheit des Vulkan-Backends gegen die Direktfaltung.
+Falls keine GPU gefunden wird, überspringt er sich mit `SKIP`.
 
 ---
 
-## How the shader works
+## Wie der Shader funktioniert
 
-`fidlib/fir_dot.comp` (GLSL compute shader):
+`fidlib/fir_dot.comp` (GLSL Compute Shader):
 ```glsl
-layout(local_size_x = 64) in;   // 64 threads per workgroup
+layout(local_size_x = 64) in;   // 64 Threads pro Workgroup
 layout(push_constant) uniform Params { int M; int B; } params;
-// CoefBuf: FIR coefficients (M values, FP32)
-// InputBuf: input ring with M-1 history + B new samples
-// OutBuf: B output samples
+// CoefBuf: FIR-Koeffizienten (M Werte, FP32)
+// InputBuf: Eingabe-Ring mit M-1 Vorgeschichte + B neue Samples
+// OutBuf: B Ausgabe-Samples
 
 void main() {
-    int i = int(gl_GlobalInvocationID.x);  // sample index
+    int i = int(gl_GlobalInvocationID.x);  // Sample-Index
     if (i >= params.B) return;
     float sum = 0.0;
     for (int k = 0; k < params.M; k++)
@@ -192,26 +192,26 @@ void main() {
 }
 ```
 
-Each thread computes one output sample independently → massively parallel.
-With B=256 and 64 threads: 4 workgroups, all parallel on the GPU.
+Jeder Thread berechnet einen Ausgabe-Sample unabhängig → massiv parallel.
+Bei B=256 und 64 Threads: 4 Workgroups, alle parallel auf der GPU.
 
 ---
 
-## Unified memory on RPi 5
+## Unified Memory auf RPi 5
 
-The VideoCore VII has unified memory (DRAM is shared by CPU and GPU).
-The Vulkan backend detects this via `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` and avoids unnecessary copies —
-the buffer is directly accessible from both sides.
+Der VideoCore VII hat unified Memory (DRAM wird von CPU und GPU geteilt).
+Das Vulkan-Backend erkennt dies via `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` und vermeidet unnötige Kopien —
+der Buffer ist direkt von beiden Seiten zugreifbar.
 
 ---
 
-## Troubleshooting
+## Problemlösungen
 
-| Problem | Cause | Solution |
-|---------|-------|---------|
-| cmake disables VULKAN | libvulkan-dev or glslangValidator missing | Install packages, rerun cmake |
-| `vk_init()` finds no device | No Vulkan ICD loaded | Check `ls /usr/share/vulkan/icd.d/` |
-| Test skips itself (SKIP) | No Vulkan device at runtime | Expected when no GPU — not an error |
-| Wrong output values | FP32 precision for long filters | Vulkan uses FP32; use OLA/NEON for FP64 |
-| High latency | Batch size too large | Reduce `FIDLIB_VULKAN_BATCH` |
+| Problem | Ursache | Lösung |
+|---------|---------|--------|
+| cmake deaktiviert VULKAN | libvulkan-dev oder glslangValidator fehlt | Pakete installieren, cmake neu |
+| `vk_init()` findet kein Gerät | Kein Vulkan-ICD geladen | `ls /usr/share/vulkan/icd.d/` prüfen |
+| Test überspringt sich (SKIP) | Kein Vulkan-Device zur Laufzeit | Erwartet wenn kein GPU — kein Fehler |
+| Falsche Ausgabe-Werte | FP32-Präzision bei langen Filtern | Vulkan rechnet FP32; für FP64 OLA/NEON verwenden |
+| Hohe Latenz | Batch-Größe zu groß | `FIDLIB_VULKAN_BATCH` reduzieren |

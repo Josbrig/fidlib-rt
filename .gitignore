@@ -1,6 +1,11 @@
 build/
 build_*/
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
+CMakeFiles/
 _deps/
 fiview.log
 fiview.coef
 a.out
+fiview2.ini
+imgui.ini

@@ -1,41 +1,41 @@
-# Vendor Analysis: Inventory and cmake Rebuild
+# Vendor-Analyse: Bestandsaufnahme und cmake-Neuaufbau
 
-Date: 2026-05-26
+Stand: 2026-05-26
 
 ---
 
-## 1. Overview of Vendor Components
+## 1. Übersicht der Vendor-Komponenten
 
-| Component | Path | Type | Size | Status |
+| Komponente | Pfad | Typ | Größe | Zustand |
 |---|---|---|---|---|
-| fidlib | `vendor/fidlib/` | Git submodule (JamesHight) | ~5,400 LOC | initialised, v0.9.11 |
-| fiview | `vendor/fiview/` | Archive copy (uazu.net) | ~6,000 LOC | complete, v0.9.10 |
-| mkfilter | `vendor/mkfilter/` | Git submodule (billthefarmer) | ~2,100 LOC | initialised |
-| gmeteor | `vendor/gmeteor/` | Archive (SourceForge) | 769 kB | complete, v0.95 (2013-01-06) |
+| fidlib | `vendor/fidlib/` | Git-Submodul (JamesHight) | ~5 400 LOC | initialisiert, v0.9.11 |
+| fiview | `vendor/fiview/` | Archiv-Kopie (uazu.net) | ~6 000 LOC | vollständig, v0.9.10 |
+| mkfilter | `vendor/mkfilter/` | Git-Submodul (billthefarmer) | ~2 100 LOC | initialisiert |
+| gmeteor | `vendor/gmeteor/` | Archiv (SourceForge) | 769 kB | vollständig, v0.95 (2013-01-06) |
 
 ---
 
 ## 2. fidlib (vendor/fidlib)
 
-### What it is
+### Was es ist
 
-C library for runtime filter design and execution. The core of the entire stack.
-Origin: Jim Peters (uazu.net, 2002–2004). This fork: JamesHight/fidlib, v0.9.11
-— consolidates all community patches (const-correctness, `extern "C"` guards, C++ compatibility).
+C-Bibliothek für Laufzeit-Filterdesign und -ausführung. Kernstück des gesamten Stacks.
+Ursprung: Jim Peters (uazu.net, 2002–2004). Dieser Fork: JamesHight/fidlib, v0.9.11
+— konsolidiert alle Community-Patches (const-Korrektheit, `extern "C"` Guards, C++-Kompatibilität).
 
-### Files
+### Dateien
 
-| File | Purpose |
+| Datei | Funktion |
 |---|---|
-| `fidlib.h` | Public API (77 lines) |
-| `fidlib.c` | Complete implementation (2,408 lines) |
-| `fidmkf.h` | mkfilter-derived filter types — included internally |
-| `fidrf_cmdlist.h` | Recommended execution engine (command-list) |
-| `fidrf_combined.h` | Alternative engine (flattened, less precise) |
-| `fidrf_jit.h` | Deprecated JIT engine (x86-only, warned) |
-| `firun.c` | CLI test tool (GPL, optional) |
+| `fidlib.h` | Öffentliches API (77 Zeilen) |
+| `fidlib.c` | Gesamte Implementierung (2 408 Zeilen) |
+| `fidmkf.h` | mkfilter-abgeleitete Filtertypen — intern includiert |
+| `fidrf_cmdlist.h` | Empfohlene Ausführungs-Engine (command-list) |
+| `fidrf_combined.h` | Alternative Engine (flattened, weniger genau) |
+| `fidrf_jit.h` | Veraltete JIT-Engine (x86-only, gewarnt) |
+| `firun.c` | CLI-Test-Tool (GPL, optional) |
 
-### Public API (fidlib.h)
+### Öffentliches API (fidlib.h)
 
 ```c
 // Housekeeping
@@ -44,7 +44,7 @@ char    *fid_version(void);
 void     fid_list_filters(FILE *out);
 int      fid_list_filters_buf(char *buf, char *bufend);
 
-// Filter design
+// Filter-Design
 FidFilter *fid_design(const char *spec, double rate,
                       double freq0, double freq1,
                       int f_adj, char **descp);
@@ -54,7 +54,7 @@ FidFilter *fid_parse(double rate, char **pp, FidFilter **ffp);
 FidFilter *fid_cv_array(double *arr);
 FidFilter *fid_cat(int freeme, ...);
 
-// Filter analysis
+// Filter-Analyse
 double     fid_response(FidFilter *filt, double freq);
 double     fid_response_pha(FidFilter *filt, double freq, double *phase);
 int        fid_calc_delay(FidFilter *filt);
@@ -63,7 +63,7 @@ void       fid_rewrite_spec(const char *spec, double freq0, double freq1,
                             int adj, char **spec1p, char **spec2p,
                             double *freq0p, double *freq1p, int *adjp);
 
-// Filter execution (real-time signal processing)
+// Filter-Ausführung (Echtzeit-Signalverarbeitung)
 void *fid_run_new(FidFilter *filt, double (**funcpp)(void *, double));
 void *fid_run_newbuf(void *run);
 int   fid_run_bufsize(void *run);
@@ -73,29 +73,29 @@ void  fid_run_freebuf(void *runbuf);
 void  fid_run_free(void *run);
 ```
 
-### Filter specification DSL (fispec)
+### Filterspezifikations-DSL (fispec)
 
 ```
-LpBu4/100        Butterworth lowpass, order 4, cutoff 100 Hz
-HpBe6/0.1        Bessel highpass, order 6, relative cutoff 0.1
-BpCh2/0.5/50-60  Chebyshev bandpass, ripple 0.5 dB, 50–60 Hz
-BsRe/100/50      Resonator bandstop, Q=100, 50 Hz
-LsBq/0.7/-6/100  Low-shelving biquad (Audio EQ Cookbook), -6 dB, 100 Hz
-x                Series connection (multiple filters chained)
+LpBu4/100        Butterworth Lowpass, Ordnung 4, Eckfreq 100 Hz
+HpBe6/0.1        Bessel Highpass, Ordnung 6, rel. Eckfreq 0.1
+BpCh2/0.5/50-60  Chebyshev Bandpass, Ripple 0.5 dB, 50–60 Hz
+BsRe/100/50      Resonator Bandstop, Q=100, 50 Hz
+LsBq/0.7/-6/100  Lowshelving Biquad (Audio-EQ-Cookbook), -6 dB, 100 Hz
+x                Serienschaltung (mehrere Filter hintereinander)
 ```
 
-Over 47 predefined filter types in three classes:
-- **mkfilter-based:** Bessel, Butterworth, Chebyshev (arbitrary order) + resonators
-- **Audio EQ Cookbook:** biquad variants (LpBq, HpBq, BpBq, PkBq, LsBq, HsBq, …)
-- **FIR windows:** Blackman, Hamming, Hann, Bartlett lowpass
+Über 47 vordefinierte Filtertypen in drei Klassen:
+- **mkfilter-basiert:** Bessel, Butterworth, Chebyshev (beliebige Ordnung) + Resonatoren
+- **Audio-EQ-Cookbook:** Biquad-Varianten (LpBq, HpBq, BpBq, PkBq, LsBq, HsBq, ...)
+- **FIR-Fenster:** Blackman, Hamming, Hann, Bartlett Lowpass
 
-### Current build system
+### Aktuelles Build-System
 
 Autotools (Autoconf + Automake + Libtool).
-Produces: `libfidlib.so` / `libfidlib.a`, optionally `firun`.
-Dependency: only `-lm`.
+Erzeugt: `libfidlib.so` / `libfidlib.a`, optional `firun`.
+Abhängigkeit: nur `-lm`.
 
-### Licence
+### Lizenz
 
 `fidlib.h` / `fidlib.c` / `fidmkf.h`: **GNU LGPL v2.1**
 `firun.c`: **GNU GPL v2**
@@ -104,49 +104,49 @@ Dependency: only `-lm`.
 
 ## 3. fiview (vendor/fiview)
 
-### What it is
+### Was es ist
 
-Interactive SDL GUI tool for filter development and visualisation.
-Purpose: view frequency response + impulse response graphically, interactively
-adjust filter parameters, export C code for the resulting filter.
+Interaktives SDL-GUI-Tool zur Filterentwicklung und -visualisierung.
+Zweck: Frequenzgang + Impulsantwort grafisch sehen, Filter-Parameter interaktiv
+justieren, C-Code für den gefundenen Filter exportieren.
 
-### Files
+### Dateien
 
-| File | Purpose |
+| Datei | Funktion |
 |---|---|
-| `src/fiview.c` | Main program, SDL loop, file output (881 lines) |
-| `src/filter.c` | Filter loading, analysis (frequency/impulse response), time constants (2,207 lines) |
-| `src/display.c` | Layout + rendering of display areas (1,132 lines) |
-| `src/graphics.c` | SDL graphics abstractions, pixel handling 16/32 bpp (1,024 lines) |
-| `src/helptext.c` | Embedded help text + dynamic filter list (593 lines) |
-| `src/scratch.c` | Scratch buffer management with auto-realloc (256 lines) |
-| `src/fidlib/` | Embedded older fidlib copy (2,304 lines) |
-| `src/mk` | Shell script build system (no Makefile, no cmake) |
+| `src/fiview.c` | Hauptprogramm, SDL-Loop, Datei-Ausgabe (881 Zeilen) |
+| `src/filter.c` | Filter-Laden, Analyse (Frequenz-/Impulsgang), Zeitkonstanten (2 207 Zeilen) |
+| `src/display.c` | Layout + Rendering der Anzeige-Bereiche (1 132 Zeilen) |
+| `src/graphics.c` | SDL-Grafik-Abstraktionen, Pixel-Handling 16/32 bpp (1 024 Zeilen) |
+| `src/helptext.c` | Eingebetteter Hilfetext + dynamische Filterliste (593 Zeilen) |
+| `src/scratch.c` | Scratch-Buffer-Verwaltung mit Auto-Realloc (256 Zeilen) |
+| `src/fidlib/` | Eingebettete ältere fidlib-Kopie (2 304 Zeilen) |
+| `src/mk` | Shell-Skript-Buildsystem (kein Makefile, kein cmake) |
 
-### Dependencies
+### Abhängigkeiten
 
-- **SDL 1.2** (graphics + events)
+- **SDL 1.2** (Grafik + Events)
 - **libm**
-- No FFTW, no GTK, no X11 directly
+- Keine FFTW, keine GTK, keine X11 direkt
 
-### Embedded fidlib vs. vendor/fidlib
+### Eingebettete fidlib vs. vendor/fidlib
 
-The `src/fidlib/` copy embedded in fiview is **older** than `vendor/fidlib`:
-- Without `extern "C"` guards
-- Without const-correctness
-- Without Autotools build
+Die in fiview enthaltene `src/fidlib/`-Kopie ist **älter** als `vendor/fidlib`:
+- Ohne `extern "C"` Guards
+- Ohne const-Korrektheit
+- Ohne Autotools-Build
 
-fiview was originally the reference frontend for fidlib — both have since become separate projects.
+fiview wurde zu seiner Zeit das Referenz-Frontend für fidlib — beide sind inzwischen getrennte Projekte.
 
-### Outputs
+### Ausgaben
 
-`fiview.log`: fully annotated C code for the displayed filter (3 versions: readable,
-compiler-optimised, with `fid_design_coef`). Also frequency response analysis, time constants.
-`fiview.coef`: raw IIR/FIR coefficients.
+`fiview.log`: Vollständig kommentierter C-Code für den angezeigten Filter (3 Versionen: lesbar,
+compiler-optimiert, mit `fid_design_coef`). Auch Frequenzgang-Analyse, Zeitkonstanten.
+`fiview.coef`: Rohe IIR/FIR-Koeffizienten.
 
-Example log is at `doc/examples/fiview_log.txt`.
+Beispiel-Log liegt unter `doc/examples/fiview_log.txt`.
 
-### Licence
+### Lizenz
 
 **GNU GPL v2**
 
@@ -154,237 +154,240 @@ Example log is at `doc/examples/fiview_log.txt`.
 
 ## 4. mkfilter (vendor/mkfilter)
 
-### What it is
+### Was es ist
 
-Academic filter design tool by Dr A.J. Fisher (Univ. York, 1992).
-Computes poles/zeros of classical IIR filters (Butterworth, Bessel, Chebyshev)
-using S-plane theory and transforms via bilinear transform (BLT) or
-matched Z-transform (MZT) into the z-domain.
+Akademisches Filter-Design-Tool von Dr. A.J. Fisher (Univ. York, 1992).
+Berechnet Pol-/Nullstellen klassischer IIR-Filter (Butterworth, Bessel, Chebyshev)
+nach der S-Plane-Theorie und transformiert via bilinearer Transform (BLT) oder
+Matched Z-Transform (MZT) in den z-Bereich.
 
-### Files
+### Dateien
 
-| File | Purpose |
+| Datei | Funktion |
 |---|---|
-| `mkfilter.C` | CLI: pole computation, BLT/MZT, difference equation, output (699 lines) |
-| `mkfilter.h` | Typedefs, constants, inline utilities |
-| `complex.C/.h` | Complex arithmetic (operators, sqrt, exp(jθ), polynomial evaluation) |
-| `gencode.C` | Filter → C code generator (reads mkfilter -l output) |
-| `genplot.C` | Filter → PNG graph via libgd |
-| `mkshape.C` | FIR designer: raised cosine, root-raised cosine, Hilbert |
-| `mkaverage.C` | Moving average FIR |
-| `readdata.C` | Helper: parser for mkfilter `-l` output |
+| `mkfilter.C` | CLI: Pol-Berechnung, BLT/MZT, Differenzengleichung, Ausgabe (699 Zeilen) |
+| `mkfilter.h` | Typedefs, Konstanten, Inline-Utils |
+| `complex.C/.h` | Komplexe Arithmetik (Operatoren, sqrt, exp(jθ), Polynomauswertung) |
+| `gencode.C` | Filter → C-Code-Generator (liest mkfilter-l-Ausgabe) |
+| `genplot.C` | Filter → PNG-Graph via libgd |
+| `mkshape.C` | FIR-Designer: Raised-Cosine, Root-Raised-Cosine, Hilbert |
+| `mkaverage.C` | Moving-Average FIR |
+| `readdata.C` | Hilfsfunktion: Parser für mkfilter-`-l`-Ausgabe |
 
-### CLI interface (short form)
+### CLI-Schnittstelle (Kurzform)
 
 ```bash
-mkfilter -Bu -Lp -o 4 -a 0.2          # Butterworth lowpass, order 4, α=0.2
-mkfilter -Ch 0.5 -Bp -o 2 -a 0.1 0.2  # Chebyshev bandpass, ripple 0.5 dB
+mkfilter -Bu -Lp -o 4 -a 0.2          # Butterworth Lowpass, Ordnung 4, α=0.2
+mkfilter -Ch 0.5 -Bp -o 2 -a 0.1 0.2  # Chebyshev Bandpass, Ripple 0.5 dB
 mkfilter -Re 10 -Bp -a 0.05            # Resonator, Q=10, α=0.05
 
-mkfilter -Bu -Lp -o 4 -a 0.2 -l | gencode -ansic   # → C code
-mkfilter -Bu -Lp -o 4 -a 0.2 -l | genplot freq.png  # → PNG frequency response
+mkfilter -Bu -Lp -o 4 -a 0.2 -l | gencode -ansic   # → C-Code
+mkfilter -Bu -Lp -o 4 -a 0.2 -l | genplot freq.png  # → PNG-Frequenzgang
 ```
 
-### Relationship to fidlib
+### Verhältnis zu fidlib
 
-**Overlap:** `fidmkf.h` in fidlib implements the same pole computations —
-Butterworth, Bessel, Chebyshev for arbitrary order. The mathematics is identical.
+**Überlappung:** `fidmkf.h` in fidlib implementiert dieselben Pol-Berechnungen —
+Butterworth, Bessel, Chebyshev für beliebige Ordnung. Die Mathematik ist identisch.
 
-**Role in the project:** Reference and validation. When fidlib computes a filter,
-mkfilter can be used to cross-check (poles, difference equation).
+**Funktion im Projekt:** Referenz und Validierung. Wenn fidlib einen Filter berechnet,
+kann mkfilter zur Überprüfung herangezogen werden (Pole, Differenzengleichung).
 
-### Current build system
+### Aktuelles Build-System
 
 GNU Make + gcc/g++ (`-std=gnu++98`, `-fpermissive`).
-`genplot` requires **libgd** (PNG output).
+`genplot` benötigt **libgd** (PNG-Ausgabe).
 
-### Licence
+### Lizenz
 
-No explicit licence statement. Academically released, distributed on GitHub for decades.
+Keine explizite Lizenzangabe. Akademisch freigegeben, seit Jahrzehnten auf GitHub verbreitet.
 
 ---
 
 ## 5. gmeteor (vendor/gmeteor)
 
-### What it is
+### Was es ist
 
-FIR filter designer for equiripple filters against arbitrary frequency response masks,
-based on Parks-McClellan / Remez exchange algorithm.
-Scheme/Guile-based. Developed ca. 2005–2013 on SourceForge.
+FIR-Filter-Designer für Equiripple-Filter nach beliebiger Frequenzgangs-Maske,
+basierend auf Parks-McClellan / Remez-Exchange-Algorithmus.
+Scheme/Guile-basiert. Entwickelt ca. 2005–2013 auf SourceForge.
 
-### Status
+### Zustand
 
-Complete source code in `vendor/gmeteor/gmeteor-0.95.tar.gz` (769 kB).
-Retrieved directly from SourceForge — the originally saved file was a
-404 HTML page (wrong download URL). The project has been inactive since 2013,
-but the download still works via `https://sourceforge.net/projects/gmeteor/files/`.
+Vollständiger Quellcode in `vendor/gmeteor/gmeteor-0.95.tar.gz` (769 kB).
+Direkt von SourceForge nachgezogen — die ursprünglich gesicherte Datei war eine
+404-HTML-Seite (falscher Download-URL). Das Projekt ist inaktiv seit 2013,
+der Download läuft aber noch über `https://sourceforge.net/projects/gmeteor/files/`.
 
-### Algorithm
+### Algorithmus
 
-Not Parks-McClellan/Remez, but **METEOR** (Steiglitz, Parks, Kaiser — IEEE Trans.
-Signal Processing, 1992): reduction of FIR design to a linear program,
-solved via simplex. Result is also equiripple but more general than classic
-Remez: arbitrary frequency response masks, also specifiable analytically via Scheme.
+Nicht Parks-McClellan/Remez, sondern **METEOR** (Steiglitz, Parks, Kaiser — IEEE Trans.
+Signal Processing, 1992): Reduktion des FIR-Designs auf ein lineares Programm,
+gelöst via Simplex. Ergebnis ebenfalls equiripple, aber allgemeiner als klassischer
+Remez: beliebige Frequenzgangs-Masken, auch analytisch via Scheme spezifizierbar.
 
-### Build system
+### Build-System
 
 Autotools (configure.ac, Makefile.am).
 
-### Source files (from tarball)
+### Quelldateien (aus Tarball)
 
-| File | Purpose |
+| Datei | Funktion |
 |---|---|
-| `gmeteor.c` | Main C code |
-| `simplex.c/.h` | Simplex algorithm (LP core) |
-| `lpp*.c` (12 files) | LP solver, Fortran-to-C conversion |
-| `f2c.h` | Fortran-to-C compatibility header |
-| `gmeteor-core.scm` | Guile/Scheme core |
-| `gmeteor-lib.scm` | Helper library |
-| `gmeteor-simple.scm` | Simplified interface |
-| `gmeteor-getopt.scm` | CLI option processing |
-| `gmeteor.in` | Script template |
-| `examples/*.scm` | 7 example specifications |
-| `doc/gmeteor.pdf` | Complete documentation |
+| `gmeteor.c` | Haupt-C-Code |
+| `simplex.c/.h` | Simplex-Algorithmus (LP-Kern) |
+| `lpp*.c` (12 Dateien) | LP-Löser, Fortran-zu-C-Konvertierung |
+| `f2c.h` | Fortran-zu-C-Kompatibilitäts-Header |
+| `gmeteor-core.scm` | Guile/Scheme-Kern |
+| `gmeteor-lib.scm` | Hilfsbibliothek |
+| `gmeteor-simple.scm` | Vereinfachte Schnittstelle |
+| `gmeteor-getopt.scm` | CLI-Optionsverarbeitung |
+| `gmeteor.in` | Skript-Template |
+| `examples/*.scm` | 7 Beispiel-Spezifikationen |
+| `doc/gmeteor.pdf` | Vollständige Dokumentation |
 
-### Dependencies
+### Abhängigkeiten
 
-- **libguile** (GNU Scheme interpreter)
+- **libguile** (GNU Scheme-Interpreter)
 - **libm**
 
-### Licence
+### Lizenz
 
 **GNU GPL**
 
-### Role in the project
+### Funktion im Projekt
 
-Closes the gap that fidlib has for equiripple FIR design: fidlib has no
-METEOR/Remez optimisation. gmeteor allows arbitrary frequency response masks.
+Schließt die Lücke die fidlib bei Equiripple-FIR-Design hat: fidlib hat keine
+METEOR/Remez-Optimierung. gmeteor erlaubt beliebige Frequenzgangs-Masken.
 
 ---
 
-## 6. Architecture overview: how the pieces fit together
+## 6. Architektur-Übersicht: Wie die Teile zusammenhängen
 
 ```
 mkfilter                    gmeteor
   │                              │
-  │  Pole/zero                   │  METEOR algorithm
-  │  computation (reference)     │  FIR equiripple (arbitrary mask)
+  │  Pol-/Nullstellen-           │  METEOR-Algorithmus
+  │  Berechnung (Referenz)       │  FIR-Equiripple (beliebige Maske)
+  │                              │
+  │  Pol-/Nullstellen-           │  METEOR-Algorithmus
+  │  Berechnung (Referenz)       │  FIR-Equiripple (beliebige Maske)
   │                              │
   └──────────────┬───────────────┘
                  │
               fidlib
-         (core library)
+         (Kernbibliothek)
          ┌─────────────────────────────────────────┐
          │  fid_design("LpBu4/100", 44100, ...)    │
-         │  → FidFilter* (internal representation)│
+         │  → FidFilter* (interne Darstellung)     │
          │  fid_run_new(filt, &funcp)              │
          │  → sample = funcp(buf, input)           │
          └─────────────────────────────────────────┘
                  │
               fiview
-         (reference frontend)
+         (Referenz-Frontend)
          ┌─────────────────────────────────────────┐
-         │  GUI: frequency response + impulse resp │
-         │  Export: fiview.log (C code)            │
-         │  Export: fiview.coef (coefficients)     │
+         │  GUI: Frequenzgang + Impulsantwort       │
+         │  Export: fiview.log (C-Code)             │
+         │  Export: fiview.coef (Koeffizienten)    │
          └─────────────────────────────────────────┘
 ```
 
 ---
 
-## 7. What the new cmake project can become
+## 7. Was das neue cmake-Projekt werden kann
 
-### Guiding principle
+### Leitgedanke
 
-fidlib and fiview are two sides of the same coin: fidlib is the engine,
-fiview was the observation tool. The new project replaces both
-with a cleanly structured cmake project — without GUI dependency,
-without an embedded fidlib copy, with modern C99 and a testable library.
+fidlib und fiview sind zwei Seiten einer Sache: fidlib ist die Maschine,
+fiview war das Werkzeug zum Beobachten. Das neue Projekt ersetzt beides
+durch ein sauber aufgebautes cmake-Projekt — ohne GUI-Abhängigkeit,
+ohne embedded-fidlib-Kopie, mit modernem C99 und einer testbaren Library.
 
-### Target architecture
+### Zielarchitektur
 
 ```
 digitalfilterdesign/
-├── CMakeLists.txt              ← root cmake
+├── CMakeLists.txt              ← Root-cmake
 ├── lib/
 │   ├── CMakeLists.txt
-│   ├── fidlib.c                ← C99-cleaned, taken from vendor/fidlib
-│   ├── fidlib.h                ← public API, with extern "C" guards
-│   ├── fidmkf.h                ← internal (mkfilter core)
-│   ├── fidrf_cmdlist.h         ← internal (execution engine)
-│   └── fidrf_combined.h        ← internal (alternative engine)
+│   ├── fidlib.c                ← C99-bereinigt, aus vendor/fidlib übernommen
+│   ├── fidlib.h                ← öffentliches API, mit extern "C" Guards
+│   ├── fidmkf.h                ← intern (mkfilter-Kern)
+│   ├── fidrf_cmdlist.h         ← intern (Ausführungs-Engine)
+│   └── fidrf_combined.h        ← intern (alternative Engine)
 ├── cli/
 │   ├── CMakeLists.txt
-│   └── firun.c                 ← CLI tool (taken from vendor/fidlib)
+│   └── firun.c                 ← CLI-Tool (aus vendor/fidlib übernommen)
 └── tests/
     ├── CMakeLists.txt
-    └── test_butterworth.c      ← impulse response validation against fiview_log.txt
+    └── test_butterworth.c      ← Impulsantwort-Validierung gegen fiview_log.txt
 ```
 
-### What is taken from vendor/
+### Was aus vendor/ übernommen wird
 
-| Vendor source | Taken as | Reason |
+| Vendor-Quelle | Übernommen als | Begründung |
 |---|---|---|
-| `vendor/fidlib/fidlib.c` | `lib/fidlib.c` | Core of the library |
-| `vendor/fidlib/fidlib.h` | `lib/fidlib.h` | Public API |
-| `vendor/fidlib/fidmkf.h` | `lib/fidmkf.h` | Filter type implementation |
-| `vendor/fidlib/fidrf_cmdlist.h` | `lib/fidrf_cmdlist.h` | Execution engine |
-| `vendor/fidlib/fidrf_combined.h` | `lib/fidrf_combined.h` | Alternative engine |
-| `vendor/fidlib/firun.c` | `cli/firun.c` | Reference CLI tool |
-| `vendor/mkfilter/` | — | Reference/validation only, no code transfer |
-| `vendor/fiview/` | — | Reference only (algorithms already in fidlib) |
-| `vendor/gmeteor/` | — | Tarball available, not yet integrated — for a later step |
+| `vendor/fidlib/fidlib.c` | `lib/fidlib.c` | Kern der Bibliothek |
+| `vendor/fidlib/fidlib.h` | `lib/fidlib.h` | Öffentliches API |
+| `vendor/fidlib/fidmkf.h` | `lib/fidmkf.h` | Filtertypen-Implementierung |
+| `vendor/fidlib/fidrf_cmdlist.h` | `lib/fidrf_cmdlist.h` | Ausführungs-Engine |
+| `vendor/fidlib/fidrf_combined.h` | `lib/fidrf_combined.h` | Alternative Engine |
+| `vendor/fidlib/firun.c` | `cli/firun.c` | Referenz-CLI-Tool |
+| `vendor/mkfilter/` | — | Nur Referenz/Validierung, kein Code-Transfer |
+| `vendor/fiview/` | — | Nur Referenz (Algorithmen bereits in fidlib) |
+| `vendor/gmeteor/` | — | Tarball vorhanden, noch nicht integriert — für späteren Schritt |
 
-### What is not taken
+### Was nicht übernommen wird
 
-- `vendor/fiview/src/fidlib/` — outdated embedded copy, replaced by `lib/fidlib.c`
-- `vendor/fiview/src/*.c` — SDL GUI, no value for the library project
-- `fidrf_jit.h` — deprecated, x86-only, with warning note in code
-- `vendor/mkfilter/genplot.C` — libgd dependency, no value
+- `vendor/fiview/src/fidlib/` — veraltete embedded-Kopie, durch `lib/fidlib.c` ersetzt
+- `vendor/fiview/src/*.c` — SDL-GUI, kein Mehrwert für Library-Projekt
+- `fidrf_jit.h` — veraltet, x86-only, mit Fehlerhinweis im Code
+- `vendor/mkfilter/genplot.C` — libgd-Abhängigkeit, kein Mehrwert
 
-### cmake targets
+### cmake-Targets
 
-| Target | Type | Description |
+| Target | Typ | Beschreibung |
 |---|---|---|
-| `fidlib` | STATIC/SHARED library | Core library, public header fidlib.h |
-| `firun` | Executable | CLI tool, optional (`-DBUILD_TOOLS=ON`) |
-| `test_butterworth` | Test | Butterworth LP 4th order impulse response against reference |
+| `fidlib` | STATIC/SHARED Library | Kernbibliothek, öffentlicher Header fidlib.h |
+| `firun` | Executable | CLI-Werkzeug, optional (`-DBUILD_TOOLS=ON`) |
+| `test_butterworth` | Test | Impulsantwort Butterworth LP 4. Ordnung gegen Referenz |
 
-### Compiler flags (from CLAUDE.md)
+### Compiler-Flags (aus CLAUDE.md)
 
 ```cmake
 target_compile_options(fidlib PRIVATE
   -Wall -Wextra -Wconversion -Wshadow -Werror
 )
-# For debug + tests:
+# Für Debug + Tests:
 target_compile_options(fidlib PRIVATE
   -fsanitize=address,undefined
 )
 ```
 
-### When vendor/ can be dropped
+### Wenn vendor/ verzichtbar sein soll
 
-vendor/ can be removed once:
+vendor/ kann wegfallen sobald:
 
-1. `lib/fidlib.c` is taken from `vendor/fidlib/fidlib.c` and C99-cleaned
-   (sanitizer-clean, no VLAs in API, no UB)
-2. `cli/firun.c` is taken from `vendor/fidlib/firun.c`
-3. A smoke test (Butterworth LP 4th order, impulse response) against the
-   reference in `doc/examples/fiview_log.txt` passes
-4. cmake is correctly configured (FetchContent-compatible)
+1. `lib/fidlib.c` aus `vendor/fidlib/fidlib.c` übernommen und C99-bereinigt ist
+   (Sanitizer-clean, keine VLAs im API, keine UB)
+2. `cli/firun.c` aus `vendor/fidlib/firun.c` übernommen ist
+3. Ein Smoke-Test (Butterworth LP 4. Ordnung, Impulsantwort) gegen die
+   Referenz in `doc/examples/fiview_log.txt` besteht
+4. cmake korrekt konfiguriert ist (FetchContent-kompatibel)
 
-The git submodules `vendor/fidlib` and `vendor/mkfilter` then become
-archive/reference only — no longer a build dependency.
+Dann sind die Git-Submodule `vendor/fidlib` und `vendor/mkfilter` nur noch
+Archiv/Referenz — keine Build-Abhängigkeit.
 
 ---
 
-## 8. Open items
+## 8. Offene Punkte
 
-| Topic | Status | Action required |
+| Thema | Status | Handlungsbedarf |
 |---|---|---|
-| gmeteor source code | present (`vendor/gmeteor/gmeteor-0.95.tar.gz`) | cmake integration for a later step |
-| fiview SDL GUI | reference, not integrated | no action needed as long as `fiview_log.txt` serves as test oracle |
-| fidrf_jit.h | deprecated, disabled | omit — do not include in cmake |
-| firun licence | GPL v2 (not LGPL) | keep firun as a clearly separate optional target |
-| mkfilter libgd | only needed for genplot | do not include genplot if no PNG output is needed |
-| Parks-McClellan FIR | no replacement for gmeteor | leave open for a later step |
+| gmeteor Quellcode | vorhanden (`vendor/gmeteor/gmeteor-0.95.tar.gz`) | cmake-Integration für späteren Schritt |
+| fiview SDL-GUI | Referenz, nicht integriert | kein Handlungsbedarf solange `fiview_log.txt` als Testorakel reicht |
+| fidrf_jit.h | veraltet, deaktiviert | weglassen — nicht in cmake aufnehmen |
+| firun Lizenz | GPL v2 (nicht LGPL) | firun als separates optionales Target klar trennen |
+| mkfilter libgd | nur für genplot nötig | genplot nicht aufnehmen, falls kein PNG-Bedarf |
+| Parks-McClellan FIR | kein Ersatz für gmeteor | für einen späteren Schritt offen lassen |

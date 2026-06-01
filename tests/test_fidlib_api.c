@@ -1,8 +1,8 @@
 /*
  * test_fidlib_api.c — full fidlib API coverage
  *
- * Tests: fid_design (all filter types), fid_flatten/fid_cat,
- *        fid_run_* lifecycle, fid_parse, fid_rewrite_spec, fid_cv_array,
+ * Checks: fid_design (all filter types), fid_flatten/fid_cat,
+ *        fid_run_* Lifecycle, fid_parse, fid_rewrite_spec, fid_cv_array,
  *        fid_set_error_handler + edge cases, fid_list_filters,
  *        fid_version, fid_calc_delay.
  */

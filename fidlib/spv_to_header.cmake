@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# Copyright (C) 2025-2026 Kai Dieki
+# Copyright (C) 2025-2026 Jörg Simbrig
 # spv_to_header.cmake
 # Usage: cmake -D INPUT=<spv> -D OUTPUT=<header> -P spv_to_header.cmake
 # Converts a SPIR-V binary file to a C header with an embedded uint32_t array.

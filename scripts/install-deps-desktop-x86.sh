@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2025-2026 Kai Dieki
-# install-deps-desktop-x86.sh — Dependencies for Desktop Linux x86_64
+# install-deps-desktop-x86.sh — Abhängigkeiten für Desktop Linux x86_64
 #
-# Target platform:  Ubuntu 22.04+ / Debian Bookworm, x86_64
-# GPU capabilities: full Vulkan and OpenCL stack available
+# Zielplattform:  Ubuntu 22.04+ / Debian Bookworm, x86_64
+# GPU-Fähigkeiten: vollständiger Vulkan- und OpenCL-Stack verfügbar
 #   NVIDIA: proprietary driver + CUDA-OpenCL / Vulkan
-#   AMD:    Mesa RADV (Vulkan) + Mesa ROCm/Clover (OpenCL) or ROCm OpenCL
+#   AMD:    Mesa RADV (Vulkan) + Mesa ROCm/Clover (OpenCL) oder ROCm OpenCL
 #   Intel:  Mesa ANV (Vulkan) + Intel NEO (OpenCL)
 #
-# Enabled features after installation:
-#   FIDLIB_SIMD=ON      SSE2 (x86_64, always available; AVX2 via compiler flags)
+# Aktivierte Features nach Installation:
+#   FIDLIB_SIMD=ON      SSE2 (x86_64, immer verfügbar; AVX2 über Compiler-Flags)
 #   FIDLIB_FFT=ON       Overlap-Save + FFTW3
 #   FIDLIB_VULKAN=ON    Vulkan 1.x Compute (NVIDIA/AMD/Intel)
-#   FIDLIB_OPENCL=ON    OpenCL (GPU/CPU depending on installed driver)
+#   FIDLIB_OPENCL=ON    OpenCL (GPU/CPU je nach installiertem Treiber)
 #
-# Usage: bash scripts/install-deps-desktop-x86.sh [--no-gpu]
+# Aufruf: bash scripts/install-deps-desktop-x86.sh [--no-gpu]
 #
-#   --no-gpu   install build base + FFTW3 only (no Vulkan/OpenCL)
+#   --no-gpu   nur Build-Basis + FFTW3 installieren (kein Vulkan/OpenCL)
 
 set -euo pipefail
 
@@ -28,63 +28,63 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 sect()  { echo -e "\n${CYAN}${BOLD}── $* ──${NC}"; }
 
-# ── Arguments ─────────────────────────────────────────────────────────────────
+# ── Argumente ────────────────────────────────────────────────────────────────
 WITH_GPU=1
 for arg in "$@"; do
     case "$arg" in
         --no-gpu) WITH_GPU=0 ;;
-        *) error "Unknown argument: $arg"; echo "Usage: $0 [--no-gpu]"; exit 1 ;;
+        *) error "Unbekanntes Argument: $arg"; echo "Aufruf: $0 [--no-gpu]"; exit 1 ;;
     esac
 done
 
-# ── Platform check ───────────────────────────────────────────────────────────
+# ── Plattform-Prüfung ────────────────────────────────────────────────────────
 ARCH=$(uname -m)
 if [[ "$ARCH" != "x86_64" ]]; then
-    warn "This script is for x86_64 — current architecture: $ARCH"
-    warn "Continue anyway?"
-    read -rp "[y/N] " C; [[ "${C,,}" == "y" ]] || exit 1
+    warn "Dieses Skript ist für x86_64 — aktuelle Architektur: $ARCH"
+    warn "Trotzdem fortfahren?"
+    read -rp "[j/N] " C; [[ "${C,,}" == "j" ]] || exit 1
 fi
 
-# ── Check aptitude ───────────────────────────────────────────────────────────
+# ── aptitude prüfen ──────────────────────────────────────────────────────────
 if ! command -v aptitude &>/dev/null; then
-    error "aptitude not found: sudo apt-get install aptitude"
+    error "aptitude nicht gefunden: sudo apt-get install aptitude"
     exit 1
 fi
 [[ $EUID -ne 0 ]] && SUDO=sudo || SUDO=
 
-# ── Packages ─────────────────────────────────────────────────────────────────
-sect "Package list"
+# ── Pakete ───────────────────────────────────────────────────────────────────
+sect "Paketliste"
 
 BUILD=(
     build-essential     # gcc, g++, make
-    cmake               # >= 3.16 required
+    cmake               # >= 3.16 erforderlich
     git
     pkg-config
 )
 
-SDL2=(                  # SDL2 source build (ExternalProject_Add)
+SDL2=(                  # SDL2-Quell-Build (ExternalProject_Add)
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev
     libxi-dev libxinerama-dev libxxf86vm-dev
     libgl1-mesa-dev libasound2-dev libpulse-dev
 )
 
 FFT=(
-    libfftw3-dev        # Overlap-Save FFTW3 backend
+    libfftw3-dev        # Overlap-Save FFTW3-Backend
 )
 
 VULKAN=(
-    libvulkan-dev       # Vulkan headers + ICD loader
-    glslang-tools       # glslangValidator: GLSL → SPIR-V for fir_dot.comp
-    spirv-tools         # spirv-dis / spirv-val (diagnostics)
-    vulkan-tools        # vulkaninfo — check GPU capabilities
-    mesa-vulkan-drivers # Mesa RADV (AMD) + ANV (Intel) Vulkan drivers
+    libvulkan-dev       # Vulkan-Header + ICD-Loader
+    glslang-tools       # glslangValidator: GLSL → SPIR-V für fir_dot.comp
+    spirv-tools         # spirv-dis / spirv-val (Diagnose)
+    vulkan-tools        # vulkaninfo — GPU-Capabilities prüfen
+    mesa-vulkan-drivers # Mesa RADV (AMD) + ANV (Intel) Vulkan-Treiber
 )
 
 OPENCL=(
-    opencl-headers      # for #include <CL/opencl.h> (compile-time)
-    ocl-icd-opencl-dev  # ICD loader + libOpenCL.so
-    ocl-icd-libopencl1  # ICD loader runtime
-    clinfo              # OpenCL diagnostics
+    opencl-headers      # für #include <CL/opencl.h> (compile-time)
+    ocl-icd-opencl-dev  # ICD-Loader + libOpenCL.so
+    ocl-icd-libopencl1  # ICD-Loader Runtime
+    clinfo              # OpenCL-Diagnose
 )
 
 DOC=(
@@ -101,39 +101,39 @@ else
     ALL=( "${BASE_PACKAGES[@]}" )
 fi
 
-sect "Base packages"
+sect "Basis-Pakete"
 printf '  %s\n' "${BASE_PACKAGES[@]}"
 
 if [[ $WITH_GPU -eq 1 ]]; then
     echo
-    sect "GPU packages (Vulkan + OpenCL)"
+    sect "GPU-Pakete (Vulkan + OpenCL)"
     printf '  %s\n' "${GPU_PACKAGES[@]}"
     echo
-    warn "Driver notes:"
-    warn "  NVIDIA: Install proprietary driver + nvidia-opencl-icd or cuda-opencl separately."
+    warn "Treiber-Hinweise:"
+    warn "  NVIDIA: Proprietären Treiber + nvidia-opencl-icd oder cuda-opencl separat installieren."
     warn "    → sudo aptitude install nvidia-driver nvidia-opencl-icd"
-    warn "  AMD:    mesa-opencl-icd (Clover/ROCm) or amdgpu-pro-opencl-icd (proprietary)."
+    warn "  AMD:    mesa-opencl-icd (Clover/ROCm) oder amdgpu-pro-opencl-icd (proprietär)."
     warn "    → sudo aptitude install mesa-opencl-icd"
-    warn "  Intel:  intel-opencl-icd (Intel NEO, recommended for OpenCL 3.0)."
+    warn "  Intel:  intel-opencl-icd (Intel NEO, empfohlen für OpenCL 3.0)."
     warn "    → sudo aptitude install intel-opencl-icd"
-    warn "  The OpenCL ICD packages are GPU-vendor-specific and are NOT installed automatically"
-    warn "  here — please install manually as needed."
+    warn "  Die OpenCL-ICD-Pakete sind GPU-Vendor-spezifisch und werden hier NICHT automatisch"
+    warn "  installiert — bitte manuell nach Bedarf nachinstallieren."
 fi
 echo
 
-# ── Simulate + confirmation ───────────────────────────────────────────────────
+# ── Simulate + Bestätigung ───────────────────────────────────────────────────
 sect "Simulation"
 $SUDO aptitude install --simulate -y "${ALL[@]}"
 echo
-read -rp "Proceed with installation? [y/N] " CONFIRM
-[[ "${CONFIRM,,}" == "y" ]] || { warn "Aborted."; exit 0; }
+read -rp "Installation durchführen? [j/N] " CONFIRM
+[[ "${CONFIRM,,}" == "j" ]] || { warn "Abgebrochen."; exit 0; }
 
-# ── Install ───────────────────────────────────────────────────────────────────
+# ── Installieren ─────────────────────────────────────────────────────────────
 sect "Installation"
 $SUDO aptitude install -y "${ALL[@]}"
 
-# ── Versions ──────────────────────────────────────────────────────────────────
-sect "Installed versions"
+# ── Versionen ────────────────────────────────────────────────────────────────
+sect "Installierte Versionen"
 cmake --version               | head -1
 gcc   --version               | head -1
 g++   --version               | head -1
@@ -141,17 +141,17 @@ pkg-config --modversion fftw3 2>/dev/null | sed 's/^/fftw3: /' || true
 
 if [[ $WITH_GPU -eq 1 ]]; then
     echo
-    info "GPU toolchain:"
-    glslangValidator --version 2>/dev/null | head -1 || warn "glslangValidator not found"
+    info "GPU-Toolchain:"
+    glslangValidator --version 2>/dev/null | head -1 || warn "glslangValidator nicht gefunden"
     vulkaninfo --summary 2>/dev/null \
         | grep -E "deviceName|apiVersion" | head -8 || true
     clinfo --list 2>/dev/null | head -10 || true
 fi
 
-# ── cmake configuration ───────────────────────────────────────────────────────
-sect "Recommended cmake configuration"
+# ── cmake-Konfiguration ──────────────────────────────────────────────────────
+sect "Empfohlene cmake-Konfiguration"
 cat <<'EOF'
-  # Full desktop build (SSE2 + FFT + Vulkan + OpenCL):
+  # Vollständiger Desktop-Build (SSE2 + FFT + Vulkan + OpenCL):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON \
         -DFIDLIB_FFT=ON \
@@ -161,19 +161,19 @@ cat <<'EOF'
   cmake --build build_desktop -j$(nproc)
   ctest --test-dir build_desktop --output-on-failure
 
-  # Vulkan only (without OpenCL):
+  # Nur Vulkan (ohne OpenCL):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_FFT=ON -DFIDLIB_VULKAN=ON \
         -S . -B build_vk
   cmake --build build_vk -j$(nproc)
 
-  # OpenCL only (without Vulkan):
+  # Nur OpenCL (ohne Vulkan):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_FFT=ON -DFIDLIB_OPENCL=ON \
         -S . -B build_ocl
   cmake --build build_ocl -j$(nproc)
 
-  # Benchmark (all backends compared):
+  # Benchmark (alle Backends im Vergleich):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_FFT=ON -DFIDLIB_VULKAN=ON -DFIDLIB_OPENCL=ON \
         -DBUILD_BENCHMARKS=ON \

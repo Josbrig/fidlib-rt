@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2025-2026 Kai Dieki
-# install-hooks.sh — Symlinks all project hooks into .git/hooks/
+# install-hooks.sh — Symlinkt alle Projekt-Hooks nach .git/hooks/
 #
-# Usage: bash scripts/install-hooks.sh
+# Aufruf: bash scripts/install-hooks.sh
 # Run once after git clone.
 
 set -euo pipefail
@@ -15,7 +15,7 @@ HOOKS_SRC="${REPO_ROOT}/scripts/hooks"
 HOOKS_DST="${REPO_ROOT}/.git/hooks"
 
 if [[ ! -d "$HOOKS_SRC" ]]; then
-    echo "Error: ${HOOKS_SRC} not found." >&2
+    echo "Fehler: ${HOOKS_SRC} nicht gefunden." >&2
     exit 1
 fi
 
@@ -25,13 +25,13 @@ for hook in "$HOOKS_SRC"/*; do
     target="${HOOKS_DST}/${name}"
 
     if [[ -L "$target" && "$(readlink "$target")" == "$hook" ]]; then
-        echo -e "${YELLOW}[skip]${NC}    $name — already installed"
+        echo -e "${YELLOW}[skip]${NC}    $name — bereits installiert"
         continue
     fi
 
     if [[ -e "$target" ]]; then
         mv "$target" "${target}.bak"
-        echo -e "${YELLOW}[backup]${NC}  $name -> ${name}.bak"
+        echo -e "${YELLOW}[backup]${NC}  $name → ${name}.bak"
     fi
 
     ln -s "$hook" "$target"
@@ -42,7 +42,7 @@ done
 
 echo
 if (( installed > 0 )); then
-    echo -e "${GREEN}$installed hook(s) installed.${NC}"
+    echo -e "${GREEN}$installed Hook(s) installiert.${NC}"
 else
-    echo "All hooks already installed."
+    echo "Alle Hooks bereits installiert."
 fi

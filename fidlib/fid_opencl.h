@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
-// Copyright (C) 2025-2026 Kai Dieki
+// Copyright (C) 2025-2026 Jörg Simbrig
 /**
  * @file fid_opencl.h
  * @brief OpenCL Compute FIR engine — GPU-accelerated FIR batch convolution (FP32).

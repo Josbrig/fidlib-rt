@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2025-2026 Kai Dieki
-# install-deps-raspi3.sh — Dependencies for Raspberry Pi 3 / Zero 2 W
+# install-deps-raspi3.sh — Abhängigkeiten für Raspberry Pi 3 / Zero 2 W
 #
-# Target platform:  RPi 3B/3B+/Zero 2 W, Raspberry Pi OS Bookworm (aarch64)
-# GPU capabilities: VideoCore IV — no Vulkan, no OpenCL
+# Zielplattform:  RPi 3B/3B+/Zero 2 W, Raspberry Pi OS Bookworm (aarch64)
+# GPU-Fähigkeiten: VideoCore IV — kein Vulkan, kein OpenCL
 #
-# Enabled features after installation:
-#   FIDLIB_SIMD=ON      NEON (AArch64, always available)
-#   FIDLIB_FFT=ON       Overlap-Save (built-in Radix-2 or FFTW3)
-#   FIDLIB_VULKAN=OFF   VideoCore IV has no Vulkan support
-#   FIDLIB_OPENCL=OFF   VideoCore IV has no OpenCL support
+# Aktivierte Features nach Installation:
+#   FIDLIB_SIMD=ON      NEON (AArch64, immer verfügbar)
+#   FIDLIB_FFT=ON       Overlap-Save (built-in Radix-2 oder FFTW3)
+#   FIDLIB_VULKAN=OFF   VideoCore IV hat keine Vulkan-Unterstützung
+#   FIDLIB_OPENCL=OFF   VideoCore IV hat keine OpenCL-Unterstützung
 #
-# Note RPi Zero 2 W: 512 MB RAM — FFTW3 backend recommended, avoid large FFT blocks
-#   (FIDLIB_FFT_THRESHOLD > 512).
+# Hinweis RPi Zero 2 W: 512 MB RAM — FFTW3-Backend empfohlen, große FFT-Blöcke
+#   (FIDLIB_FFT_THRESHOLD > 512) vermeiden.
 #
-# Usage: bash scripts/install-deps-raspi3.sh
+# Aufruf: bash scripts/install-deps-raspi3.sh
 
 set -euo pipefail
 
@@ -26,51 +26,51 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 sect()  { echo -e "\n${CYAN}${BOLD}── $* ──${NC}"; }
 
-# ── Platform check ───────────────────────────────────────────────────────────
+# ── Plattform-Prüfung ────────────────────────────────────────────────────────
 ARCH=$(uname -m)
 if [[ "$ARCH" != "aarch64" ]]; then
-    warn "This script is for aarch64 (RPi 3/Zero2) — current architecture: $ARCH"
-    warn "Continue anyway?"
-    read -rp "[y/N] " C; [[ "${C,,}" == "y" ]] || exit 1
+    warn "Dieses Skript ist für aarch64 (RPi 3/Zero2) — aktuelle Architektur: $ARCH"
+    warn "Trotzdem fortfahren?"
+    read -rp "[j/N] " C; [[ "${C,,}" == "j" ]] || exit 1
 fi
 
 if ! grep -qi "raspberry" /proc/cpuinfo 2>/dev/null &&
    ! grep -qi "BCM2837\|BCM2710" /proc/cpuinfo 2>/dev/null; then
-    warn "No BCM2837/BCM2710 SoC detected — not a Raspberry Pi 3 / Zero 2 W?"
+    warn "Kein BCM2837/BCM2710-SoC erkannt — kein Raspberry Pi 3 / Zero 2 W?"
 fi
 
-# ── Check RAM (Zero 2 W: 512 MB) ─────────────────────────────────────────────
+# ── RAM prüfen (Zero 2 W: 512 MB) ────────────────────────────────────────────
 TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo 0)
 if [[ "$TOTAL_MEM_KB" -lt 700000 && "$TOTAL_MEM_KB" -gt 0 ]]; then
-    warn "Low RAM detected (~512 MB — RPi Zero 2 W?)."
-    warn "  FFTW3 (libfftw3-dev) will be installed — keep FFT_THRESHOLD low (≤ 512)."
+    warn "Wenig RAM erkannt (~512 MB — RPi Zero 2 W?)."
+    warn "  FFTW3 (libfftw3-dev) wird installiert — FFT_THRESHOLD niedrig halten (≤ 512)."
 fi
 
-# ── Check aptitude ───────────────────────────────────────────────────────────
+# ── aptitude prüfen ──────────────────────────────────────────────────────────
 if ! command -v aptitude &>/dev/null; then
-    error "aptitude not found: sudo apt-get install aptitude"
+    error "aptitude nicht gefunden: sudo apt-get install aptitude"
     exit 1
 fi
 [[ $EUID -ne 0 ]] && SUDO=sudo || SUDO=
 
-# ── Packages ─────────────────────────────────────────────────────────────────
-sect "Package list"
+# ── Pakete ───────────────────────────────────────────────────────────────────
+sect "Paketliste"
 
 BUILD=(
     build-essential     # gcc, g++, make
-    cmake               # >= 3.16 required
+    cmake               # >= 3.16 erforderlich
     git
     pkg-config
 )
 
-SDL2=(                  # SDL2 source build (ExternalProject_Add)
+SDL2=(                  # SDL2-Quell-Build (ExternalProject_Add)
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev
     libxi-dev libxinerama-dev libxxf86vm-dev
     libgl1-mesa-dev libasound2-dev libpulse-dev
 )
 
 FFT=(
-    libfftw3-dev        # Overlap-Save FFTW3 backend (faster than built-in Radix-2)
+    libfftw3-dev        # Overlap-Save FFTW3-Backend (schneller als built-in Radix-2)
 )
 
 DOC=(
@@ -82,30 +82,30 @@ ALL=( "${BUILD[@]}" "${SDL2[@]}" "${FFT[@]}" "${DOC[@]}" )
 
 printf '  %s\n' "${ALL[@]}"
 
-info "GPU note: VideoCore IV (RPi 3 / Zero 2 W) does not support Vulkan/OpenCL."
-info "  Optimal path: NEON-SIMD + Overlap-Save FFT."
+info "GPU-Hinweis: VideoCore IV (RPi 3 / Zero 2 W) unterstützt kein Vulkan/OpenCL."
+info "  Optimaler Pfad: NEON-SIMD + Overlap-Save FFT."
 
-# ── Simulate + confirmation ───────────────────────────────────────────────────
+# ── Simulate + Bestätigung ───────────────────────────────────────────────────
 sect "Simulation"
 $SUDO aptitude install --simulate -y "${ALL[@]}"
 echo
-read -rp "Proceed with installation? [y/N] " CONFIRM
-[[ "${CONFIRM,,}" == "y" ]] || { warn "Aborted."; exit 0; }
+read -rp "Installation durchführen? [j/N] " CONFIRM
+[[ "${CONFIRM,,}" == "j" ]] || { warn "Abgebrochen."; exit 0; }
 
-# ── Install ───────────────────────────────────────────────────────────────────
+# ── Installieren ─────────────────────────────────────────────────────────────
 sect "Installation"
 $SUDO aptitude install -y "${ALL[@]}"
 
-# ── Versions ──────────────────────────────────────────────────────────────────
-sect "Installed versions"
+# ── Versionen ────────────────────────────────────────────────────────────────
+sect "Installierte Versionen"
 cmake --version               | head -1
 gcc   --version               | head -1
 pkg-config --modversion fftw3 2>/dev/null | sed 's/^/fftw3: /' || true
 
-# ── cmake configuration ───────────────────────────────────────────────────────
-sect "Recommended cmake configuration"
+# ── cmake-Konfiguration ──────────────────────────────────────────────────────
+sect "Empfohlene cmake-Konfiguration"
 cat <<'EOF'
-  # Standard RPi 3 / Zero 2 W build (NEON + FFT):
+  # Standard-Build RPi 3 / Zero 2 W (NEON + FFT):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON \
         -DFIDLIB_FFT=ON \
@@ -113,7 +113,7 @@ cat <<'EOF'
   cmake --build build_raspi3 -j$(nproc)
   ctest --test-dir build_raspi3 --output-on-failure
 
-  # Zero 2 W: keep FFT threshold low (limited RAM):
+  # Zero 2 W: FFT-Threshold niedrig halten (wenig RAM):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON \
         -DFIDLIB_FFT=ON \

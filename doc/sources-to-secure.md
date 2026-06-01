@@ -1,152 +1,152 @@
-# Sources to Secure — Inventory
+# Zu sichernde Quellen — Bestandsaufnahme
 
-Date: 2026-05-26  
-Context: All external resources referenced by fiview/fidlib, assessed by
-availability and relevance to the project.
+Datum: 2026-05-26  
+Kontext: Alle von fiview/fidlib referenzierten externen Ressourcen, bewertet nach
+Verfügbarkeit und Relevanz für das Projekt.
 
 ---
 
-## Status Overview
+## Status-Übersicht
 
-| Resource | URL / Source | Status | Priority |
+| Ressource | URL / Quelle | Status | Priorität |
 |---|---|---|---|
-| fidlib.txt (API docs) | uazu.net/fidlib/fidlib.txt | ✅ secured | ✅ done |
-| firun.txt (CLI docs) | uazu.net/fidlib/firun.txt | ✅ secured | ✅ done |
-| fidlib-0.9.10.tgz (original) | uazu.net/fidlib/ | ✅ reachable | medium |
-| mkfilter source code | University of York | ❌ **dead** | **high** |
-| mkfilter (billthefarmer fork) | github.com/billthefarmer/mkfilter | ✅ reachable | **high** |
-| Audio EQ Cookbook (original) | harmony-central.com | ❌ **dead** (casino site) | — |
-| Audio EQ Cookbook (W3C canonical) | webaudio.github.io/Audio-EQ-Cookbook | ✅ secured | ✅ done |
-| GMeteor 0.95 | gmeteor.sourceforge.net | ✅ secured | ✅ done |
-| OpenEEG | openeeg.sf.net | ⚠️ SourceForge | low |
-| fiview_log.txt | uazu.net/fiview/fiview_log.txt | ✅ secured | ✅ done |
-| fiview-0.9.10 source code | uazu.net/fiview/ | ✅ secured | ✅ done |
-| fidlib (JamesHight) | github.com/JamesHight/fidlib | ✅ in fidlib/ | ✅ done |
-| SDL 2 | github.com/libsdl-org/SDL | ✅ local mirror available | ✅ done |
-| SDL 1.2 | github.com/libsdl-org/SDL-1.2 | mirror pending | open |
+| fidlib.txt (API-Doku) | uazu.net/fidlib/fidlib.txt | ✅ gesichert | ✅ erledigt |
+| firun.txt (CLI-Doku) | uazu.net/fidlib/firun.txt | ✅ gesichert | ✅ erledigt |
+| fidlib-0.9.10.tgz (Original) | uazu.net/fidlib/ | ✅ erreichbar | mittel |
+| mkfilter Quellcode | University of York | ❌ **tot** | **hoch** |
+| mkfilter (billthefarmer-Fork) | github.com/billthefarmer/mkfilter | ✅ erreichbar | **hoch** |
+| Audio EQ Cookbook (original) | harmony-central.com | ❌ **tot** (Casino-Site) | — |
+| Audio EQ Cookbook (W3C-Kanonisch) | webaudio.github.io/Audio-EQ-Cookbook | ✅ gesichert | ✅ erledigt |
+| GMeteor 0.95 | gmeteor.sourceforge.net | ✅ gesichert | ✅ erledigt |
+| OpenEEG | openeeg.sf.net | ⚠️ SourceForge | niedrig |
+| fiview_log.txt | uazu.net/fiview/fiview_log.txt | ✅ gesichert | ✅ erledigt |
+| fiview-0.9.10 Quellcode | uazu.net/fiview/ | ✅ gesichert | ✅ erledigt |
+| fidlib (JamesHight) | github.com/JamesHight/fidlib | ✅ in fidlib/ | ✅ erledigt |
+| SDL 2 | github.com/libsdl-org/SDL | ✅ lokaler Mirror vorhanden | ✅ erledigt |
+| SDL 1.2 | github.com/libsdl-org/SDL-1.2 | Mirror ausstehend | offen |
 
 ---
 
-## Detailed Assessment
+## Detailbewertung
 
-### 1. fidlib.txt — API Documentation (HIGH)
+### 1. fidlib.txt — API-Dokumentation (HOCH)
 
 **URL:** https://uazu.net/fidlib/fidlib.txt (25 KB)
 
-The only complete reference for all 47 filter types, the fispec string syntax,
-the complete C API, and the internal data structures (`FidFilter`, `FidRun`).
-Not included in the JamesHight GitHub repo (only as a compressed part of the `.tgz`).
+Die einzige vollständige Referenz für alle 47 Filtertypen, die Fispec-String-Syntax,
+die komplette C-API, und die internen Datenstrukturen (`FidFilter`, `FidRun`).
+Nicht im GitHub-Repo von JamesHight enthalten (nur als komprimierter Teil des `.tgz`).
 
-→ **Secure:** `doc/reference/fidlib.txt`
+→ **Sichern:** `doc/reference/fidlib.txt`
 
 ---
 
-### 2. firun.txt — CLI Documentation (HIGH)
+### 2. firun.txt — CLI-Dokumentation (HOCH)
 
 **URL:** https://uazu.net/fidlib/firun.txt (5 KB)
 
-Complete description of all firun options, data formats (`a`, `b`, `s`, `S`, `f`, …),
-multi-channel filter chaining syntax and test modes (impulse, step, frequency response).
-Also not in the JamesHight repo, but in the vendor/fiview tarball as `README.firun`.
+Vollständige Beschreibung aller firun-Optionen, Datenformate (`a`, `b`, `s`, `S`, `f`, …),
+Mehrkanal-Filterchaining-Syntax und Testmodi (Impuls-, Sprung-, Frequenzantwort).
+Ebenfalls nicht im JamesHight-Repo, aber im vendor/fiview-Tarball als `README.firun`.
 
-→ **Secure:** `doc/reference/firun.txt` (original version from uazu.net)
-
----
-
-### 3. mkfilter — Mathematical Core (HIGH, AT RISK)
-
-**Original URL:** http://www-users.cs.york.ac.uk/~fisher/mkfilter — **DEAD**
-
-Tony Fisher (University of York) is deceased. All URLs under `cs.york.ac.uk/~fisher/`
-have been replaced by a 301 redirect to the computer science department's general news page.
-The source code is no longer officially available.
-
-**Why critical:** `fidmkf.h` in fidlib is a direct derivative of mkfilter. The
-algorithm for Butterworth, Bessel and Chebyshev filters (pole calculation, bilinear
-transform, prewarping) comes entirely from mkfilter. Without the source, the
-mathematical basis of the project can no longer be traced.
-
-**Available archives:**
-- `github.com/billthefarmer/mkfilter` — 22 commits, C++, slightly modernized for
-  current GCC versions, PNG plot support added. Contains original docs
-  (`doc.pdf`). **Best available source.**
-- `github.com/minimum-necessary-change/mkfilter` — port for modern compilers,
-  references York URL as source.
-- `github.com/MikeCurrington/mkfilter` — includes bugfixes from Miriam Ruiz (Debian).
-
-→ **Secure:** `billthefarmer/mkfilter` as second submodule under `vendor/mkfilter`
+→ **Sichern:** `doc/reference/firun.txt` (Originalversion von uazu.net)
 
 ---
 
-### 4. Audio EQ Cookbook — Biquad Reference (MEDIUM)
+### 3. mkfilter — Mathematischer Kern (HOCH, GEFÄHRDET)
 
-**Original URL:** http://www.harmony-central.com/Computer/Programming/Audio-EQ-Cookbook.txt  
-→ **DEAD** (domain now shows a French online casino site)
+**Original-URL:** http://www-users.cs.york.ac.uk/~fisher/mkfilter — **DEAD**
 
-**Canonical replacement URL (W3C/WebAudio WG):**  
+Tony Fisher (University of York) ist verstorben. Alle URLs unter `cs.york.ac.uk/~fisher/`
+wurden durch einen 301-Redirect auf die allgemeine Neuigkeitenseite der Informatik-Abteilung
+ersetzt. Der Quellcode ist nicht mehr offiziell erreichbar.
+
+**Warum kritisch:** `fidmkf.h` in fidlib ist ein direkter Ableger von mkfilter. Der
+Algorithmus für Butterworth-, Bessel- und Chebyshev-Filter (Pol-Berechnung, Bilinear-
+Transform, Prewarping) stammt vollständig aus mkfilter. Ohne die Quelle ist die
+mathematische Basis des Projekts nicht mehr nachvollziehbar.
+
+**Verfügbare Archive:**
+- `github.com/billthefarmer/mkfilter` — 22 Commits, C++, leicht modernisiert für
+  aktuelle GCC-Versionen, PNG-Plot-Unterstützung hinzugefügt. Enthält Originaldoku
+  (`doc.pdf`). **Beste verfügbare Quelle.**
+- `github.com/minimum-necessary-change/mkfilter` — Portierung für moderne Compiler,
+  referenziert York-URL als Quelle.
+- `github.com/MikeCurrington/mkfilter` — Includes Bugfixes von Miriam Ruiz (Debian).
+
+→ **Sichern:** `billthefarmer/mkfilter` als zweites Submodule unter `vendor/mkfilter`
+
+---
+
+### 4. Audio EQ Cookbook — Biquad-Referenz (MITTEL)
+
+**Original-URL:** http://www.harmony-central.com/Computer/Programming/Audio-EQ-Cookbook.txt  
+→ **DEAD** (Domain zeigt jetzt eine französische Online-Casino-Seite)
+
+**Kanonische Ersatz-URL (W3C/WebAudio WG):**  
 https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html  
-Published with permission of Robert Bristow-Johnson, edited by Raymond Toy
-and Doug Schepers. Contains all biquad coefficient formulas (LP, HP, BP, Notch,
-Allpass, Peaking EQ, Low-Shelf, High-Shelf) with complete mathematical derivation.
+Herausgegeben mit Genehmigung von Robert Bristow-Johnson, editiert von Raymond Toy
+und Doug Schepers. Enthält alle Biquad-Koeffizienten-Formeln (LP, HP, BP, Notch,
+Allpass, Peaking EQ, Low-Shelf, High-Shelf) mit vollständiger mathematischer Herleitung.
 
-fidlib uses these formulas for the Audio EQ filter types (`LpBq`, `HpBq`, `PkBq`,
+fidlib nutzt diese Formeln für die Audio-EQ-Filtertypen (`LpBq`, `HpBq`, `PkBq`,
 `LsBq`, `HsBq` etc.).
 
-→ **Secure:** `doc/reference/audio-eq-cookbook.html` (local copy of the W3C version)
+→ **Sichern:** `doc/reference/audio-eq-cookbook.html` (lokale Kopie der W3C-Version)
 
 ---
 
-### 5. GMeteor 0.95 — FIR Constraint Design (MEDIUM, AT RISK)
+### 5. GMeteor 0.95 — FIR-Constraint-Design (MITTEL, GEFÄHRDET)
 
 **URL:** https://gmeteor.sourceforge.net/
 
-Tool for equiripple FIR filters with linear phase according to arbitrary
-frequency response specifications (via Guile/Scheme scripts). Last release: 2013.
-SourceForge projects are historically at risk (downtime, link rot,
-adware injections into binaries a few years ago).
+Werkzeug für equiripple FIR-Filter mit linearer Phase nach beliebigen
+Frequenzgangsvorgaben (über Guile/Scheme-Skripte). Letzte Veröffentlichung: 2013.
+SourceForge-Projekte sind historisch gefährdet (Downtime, Link-Rot,
+Adware-Injektionen in Binaries vor einigen Jahren).
 
-Relevance: fidlib contains no FIR constraint design algorithms — GMeteor fills
-this gap for complex FIR requirements.
+Relevanz: fidlib enthält keine FIR-Constraint-Design-Algorithmen — GMeteor füllt
+diese Lücke für komplexe FIR-Anforderungen.
 
-→ **Secure:** source tarball `gmeteor-0.95.tar.gz` under `vendor/gmeteor/`
+→ **Sichern:** Quell-Tarball `gmeteor-0.95.tar.gz` unter `vendor/gmeteor/`
 
 ---
 
-### 6. fidlib-0.9.10.tgz — Original Jim Peters (MEDIUM)
+### 6. fidlib-0.9.10.tgz — Original Jim Peters (MITTEL)
 
 **URL:** https://uazu.net/fidlib/fidlib-0.9.10.tgz (86 KB)
 
-Contains the original version without JamesHight patches, plus the precompiled
-Linux binary of firun. Relevant as a diff reference: what changes did JamesHight
-make relative to the original?
+Enthält die originale Version ohne JamesHight-Patches, dazu den vorkompilierten
+Linux-Binary von firun. Relevant als Diff-Referenz: Welche Änderungen hat
+JamesHight gegenüber dem Original vorgenommen?
 
-The tarball also contains `fidlib.txt` and `firun.txt` — if uazu.net ever goes
-offline, this is an additional backup.
+Der Tarball enthält auch `fidlib.txt` und `firun.txt` — falls uazu.net irgendwann
+offline geht, ist dies ein weiteres Backup.
 
-→ **Secure:** Can be saved as a direct download or the source code extracted from
-the original tarball and placed in `vendor/fidlib-orig/`.
+→ **Sichern:** Kann als direkter Download gespeichert werden oder der enthaltene
+Quellcode wird mit dem Original-Tarball-Inhalt in `vendor/fidlib-orig/` abgelegt.
 
 ---
 
-### 7. OpenEEG — Historical Application Context (LOW)
+### 7. OpenEEG — Historischer Anwendungskontext (NIEDRIG)
 
 **URL:** http://openeeg.sf.net/
 
-The OpenEEG project was the original occasion for the development of fidlib.
-Contains EEG hardware schematics and software. Historically interesting as
-application context, but not relevant to the filter design project itself.
+Das OpenEEG-Projekt war der ursprüngliche Anlass für die Entwicklung von fidlib.
+Enthält EEG-Hardware-Schemata und Software. Historisch interessant als
+Anwendungskontext, aber für das Filterdesign-Projekt selbst nicht relevant.
 
-→ No securing needed
+→ Kein Sicherungsbedarf
 
 ---
 
-## Recommended Securing Order
+## Empfohlene Sicherungsreihenfolge
 
 ```
-1. vendor/mkfilter/     ← billthefarmer/mkfilter as submodule  (CRITICAL)
-2. doc/reference/fidlib.txt                                       (important)
-3. doc/reference/firun.txt                                        (important)
-4. doc/reference/audio-eq-cookbook.html                           (important)
-5. vendor/gmeteor/      ← tarball from SourceForge               (risk-driven)
-6. vendor/fidlib-orig/  ← uazu.net original tarball               (optional)
+1. vendor/mkfilter/     ← billthefarmer/mkfilter als Submodule  (KRITISCH)
+2. doc/reference/fidlib.txt                                       (wichtig)
+3. doc/reference/firun.txt                                        (wichtig)
+4. doc/reference/audio-eq-cookbook.html                           (wichtig)
+5. vendor/gmeteor/      ← Tarball von SourceForge                 (risikogetrieben)
+6. vendor/fidlib-orig/  ← uazu.net Original-Tarball               (optional)
 ```

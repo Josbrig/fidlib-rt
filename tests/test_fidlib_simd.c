@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2025-2026 Kai Dieki
+// Copyright (C) 2025-2026 Jörg Simbrig
 /*
- * test_fidlib_simd.c — correctness of SIMD acceleration (NEON/SSE2)
+ * test_fidlib_simd.c — Korrektheit der SIMD-Beschleunigung (NEON/SSE2)
  *
- * Tests:
- *   1. fid_fir_dot() directly against scalar reference implementation
+ * Testet:
+ *   1. fid_fir_dot() direkt gegen skalare Referenzimplementierung
  *      (only when FIDLIB_SIMD is defined, otherwise skipped)
- *   2. 16-tap boxcar FIR with impulse response — end-to-end
+ *   2. 16-Tap Boxcar-FIR mit Impulsantwort — Ende-zu-Ende
  *      (always runs; triggers opcode 8 in the command-list backend)
  */
 
@@ -79,8 +79,8 @@ test_fir_dot_primitive(void)
 static void
 test_boxcar_impulse(void)
 {
-    /* 16-tap boxcar: all coefficients = 1/16
-     * impulse response: 16 outputs of 1/16 each, then zero. */
+    /* 16-Tap Boxcar: alle Koeffizienten = 1/16
+     * Impulsantwort: 16 Ausgaben je 1/16, dann Null. */
     const double w = 1.0 / (double)N_TAPS;
 
     /* array format for fid_cv_array: type, len, val[0..len-1], 0 */
@@ -116,7 +116,7 @@ test_boxcar_impulse(void)
     free(ff);
 }
 
-/* ── 3. Boxcar-FIR with fid_run_bufsize / fid_run_initbuf ────────────── */
+/* ── 3. Boxcar-FIR mit fid_run_bufsize / fid_run_initbuf ─────────────── */
 
 static void
 test_boxcar_initbuf(void)
@@ -188,7 +188,7 @@ int main(void)
     test_boxcar_impulse();
     printf("\n");
 
-    printf("=== Boxcar-FIR with fid_run_initbuf / fid_run_zapbuf ===\n");
+    printf("=== Boxcar-FIR mit fid_run_initbuf / fid_run_zapbuf ===\n");
     test_boxcar_initbuf();
     printf("\n");
 

@@ -1,10 +1,10 @@
 /*
  * test_filter_analysis.c — numerical tests for filter.c analysis functions
  *
- * Covers: filter_response, filter_resp_range, filter_setup_gain,
- *         filter_setup_cnt, filter_run/runfilter_step, filter_dump.
+ * Deckt ab: filter_response, filter_resp_range, filter_setup_gain,
+ *            filter_setup_cnt, filter_run/runfilter_step, filter_dump.
  *
- * Reference values from doc/examples/fiview_log.txt (LpBu6/=400, sr=44100).
+ * Referenzwerte aus doc/examples/fiview_log.txt (LpBu6/=400, sr=44100).
  */
 
 #include "test_all.h"

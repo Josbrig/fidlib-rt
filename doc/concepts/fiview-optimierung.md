@@ -1,96 +1,96 @@
-# Concept: fiview — SDL2 Migration, C++20, Modernization
+# Konzept: fiview — SDL2-Migration, C++20, Modernisierung
 
-## Goal
+## Ziel
 
-fiview is an interactive filter visualizer (SDL 1.2, ~1500 lines of C).
-Currently it builds via ExternalProject against SDL 1.2 (with 3 aarch64 patches).
+fiview ist ein interaktiver Filter-Visualizer (SDL 1.2, ~1500 Zeilen C).
+Aktuell baut er via ExternalProject gegen SDL 1.2 (mit 3 aarch64-Patches).
 
-Mid-term goal:
-1. SDL 2 migration (SDL 1.2 has been end-of-life since 2012, no Wayland)
-2. Establish C++20 compilability
-3. Modernize fidlib integration (uses an embedded copy, should use our lib target — already done via include redirect in cmake)
+Mittelfristiges Ziel:
+1. SDL 2 Migration (SDL 1.2 ist End-of-Life seit 2012, kein Wayland)
+2. C++20-Kompilierbarkeit herstellen
+3. fidlib-Integration modernisieren (nutzt eingebettete Kopie, soll unser lib-Target nutzen — bereits erledigt via include-Redirect in cmake)
 
 ---
 
-## Phase 1 — SDL2 Migration
+## Phase 1 — SDL2-Migration
 
-### Differences SDL1 → SDL2 in fiview
+### Unterschiede SDL1 → SDL2 in fiview
 
-| Area | SDL 1.2 | SDL 2 |
+| Bereich | SDL 1.2 | SDL 2 |
 |---|---|---|
-| Initialization | `SDL_SetVideoMode()` | `SDL_CreateWindow()` + `SDL_CreateRenderer()` |
-| Surface/pixel | `SDL_Surface *disp` directly | `SDL_Texture` + `SDL_Renderer` |
-| Pixel access | `disp->pixels` directly | `SDL_LockTexture()` |
-| Events | `SDL_PollEvent` (same) | `SDL_PollEvent` (largely the same) |
-| Keyboard | `SDL_keysym.sym` | `SDL_Keysym.sym` (same) |
-| Audio | not used | — |
+| Initialisierung | `SDL_SetVideoMode()` | `SDL_CreateWindow()` + `SDL_CreateRenderer()` |
+| Surface/Pixel | `SDL_Surface *disp` direkt | `SDL_Texture` + `SDL_Renderer` |
+| Pixel-Zugriff | `disp->pixels` direkt | `SDL_LockTexture()` |
+| Events | `SDL_PollEvent` (gleich) | `SDL_PollEvent` (weitgehend gleich) |
+| Keyboard | `SDL_keysym.sym` | `SDL_Keysym.sym` (gleich) |
+| Audio | nicht genutzt | — |
 
-fiview uses direct pixel access (`disp_pix32`, `disp_pix16`).
-This is the largest change point: SDL2 only allows this through textures.
+fiview nutzt direkten Pixel-Zugriff (`disp_pix32`, `disp_pix16`).
+Das ist der größte Änderungspunkt: SDL2 erlaubt das nur über Textures.
 
-### Migration Plan
+### Migrationsplan
 
 ```
 1. display.c: SDL_SetVideoMode → SDL_CreateWindow + SDL_CreateRenderer
    + SDL_CreateTexture (SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING)
-2. Pixel write: redirect all disp_pix32[y*disp_sx+x] = col accesses into a
-   managed pixel buffer; SDL_UpdateTexture() once per frame
-3. graphics.c: adapt color mapping to SDL2 pixel format
-4. Event loop in main (fiview.c): SDL_Quit event, SDL_WINDOWEVENT_RESIZED
-5. SDL2 via ExternalProject_Add from upstream GitHub (libsdl-org/SDL)
-   → analogous to SDL12_ext
+2. Pixel-Write: alle disp_pix32[y*disp_sx+x] = col Zugriffe in einen
+   gemanagten Pixel-Buffer umleiten; SDL_UpdateTexture() einmal pro Frame
+3. graphics.c: Farb-Mapping auf SDL2-Pixel-Format anpassen
+4. Event-Loop in main (fiview.c): SDL_Quit-Event, SDL_WINDOWEVENT_RESIZED
+5. SDL2: https://github.com/libsdl-org/SDL.git
+   → ExternalProject_Add SDL2_ext analog SDL12_ext
 ```
 
-### cmake Conversion
+### cmake-Umstellung
 
 ```cmake
-# tools/fiview/CMakeLists.txt — SDL2 variant:
-option(FIVIEW_USE_SDL2 "Build fiview against SDL2 instead of SDL1.2" OFF)
+# tools/fiview/CMakeLists.txt — SDL2-Variante:
+option(FIVIEW_USE_SDL2 "fiview gegen SDL2 statt SDL1.2 bauen" OFF)
 
 if(FIVIEW_USE_SDL2)
   # SDL2 via ExternalProject
   ExternalProject_Add(SDL2_ext
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG        <SHA-of-last-SDL2-release>
+    GIT_TAG        <SHA-des-letzten-SDL2-release>
     CMAKE_ARGS     -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                    -DSDL_STATIC=ON -DSDL_SHARED=OFF
   )
-  # SDL2 has CMakeLists.txt — no Autotools wrapper needed
+  # SDL2 hat CMakeLists.txt — kein Autotools-Wrapper nötig
   ...
 else()
-  # existing SDL1.2 ExternalProject remains
+  # bestehende SDL1.2-ExternalProject bleibt
 endif()
 ```
 
-SDL 2 has its own cmake build system — no autoreconf, no
-aarch64 patches needed. The build is considerably simpler than SDL 1.2.
+SDL 2 hat ein eigenes cmake-Build-System — kein autoreconf, keine
+aarch64-Patches nötig. Der Build ist erheblich einfacher als SDL 1.2.
 
 ---
 
-## Phase 2 — C++20 Compilability
+## Phase 2 — C++20-Kompilierbarkeit
 
-fiview uses many global `char *` string literals (help texts in
-`helptext.c`). Analogous to fidlib:
+fiview nutzt viele globale `char *` String-Literale (Hilfetexte in
+`helptext.c`). Analog zu fidlib:
 
-- `char *` → `const char *` for all literals
-- Check for VLA usage (if present)
-- Pixel arithmetic: cast correctness under `-Wold-style-cast`
-
----
-
-## Phase 3 — Architecture Improvements (optional)
-
-- Filter switching without restart: `fid_run_free` + `fid_run_new` at runtime
-- Multi-filter overlay: display multiple `RunBuf` instances simultaneously
-- Export: output frequency response as CSV/JSON (no SDL needed → separate CLI target)
+- `char *` → `const char *` für alle Literale
+- VLA-Nutzung (falls vorhanden) prüfen
+- Pixel-Arithmetik: Cast-Korrektheit unter `-Wold-style-cast`
 
 ---
 
-## Dependencies
+## Phase 3 — Architektur-Verbesserungen (optional)
 
-- SDL2: upstream GitHub (libsdl-org/SDL) via ExternalProject_Add ✓
-- fidlib integration via cmake include redirect: ✓ (already done)
+- Filter-Wechsel ohne Neustart: `fid_run_free` + `fid_run_new` zur Laufzeit
+- Multi-Filter-Overlay: mehrere `RunBuf`-Instanzen gleichzeitig darstellen
+- Export: Frequenzgang als CSV/JSON ausgeben (ohne SDL nötig → eigenes CLI-Target)
 
 ---
 
-*Created: 2026-05-27*
+## Abhängigkeiten
+
+- SDL2: https://github.com/libsdl-org/SDL.git
+- fidlib-Integration via cmake-Include-Redirect: ✓ (bereits erledigt)
+
+---
+
+*Erstellt: 2026-05-27*

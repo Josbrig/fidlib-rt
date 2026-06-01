@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
-# Copyright (C) 2025-2026 Kai Dieki (cmake build system)
+# Copyright (C) 2025-2026 Jörg Simbrig (cmake build system)
 # firun source: Copyright (C) 2004 Jim Peters <jim@uazu.net>, GPL-2.0-only
 option(FIRUN_CXX20_COMPAT "Compile firun with C++20 compiler" OFF)
 

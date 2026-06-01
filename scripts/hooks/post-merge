@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# post-merge — Warns when files have shrunk due to the merge.
+# post-merge — Warnt wenn Dateien durch den Merge geschrumpft sind.
 #
-# Installation: run scripts/install-hooks.sh (symlinks into .git/hooks/)
+# Installation: scripts/install-hooks.sh ausführen (symlinkt nach .git/hooks/)
 
 set -euo pipefail
 
@@ -9,13 +9,13 @@ RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; NC='\033[0m'
 
 ORIG=${ORIG_HEAD:-}
 if [[ -z "$ORIG" ]]; then
-    # ORIG_HEAD is set by git merge; missing on first checkout.
+    # ORIG_HEAD wird von git merge gesetzt; beim ersten Checkout fehlt es.
     exit 0
 fi
 
 SHRUNK=()
 
-# All files changed in the merge commit
+# Alle Dateien die im Merge-Commit geändert wurden
 while IFS= read -r file; do
     [[ -f "$file" ]] || continue
 
@@ -24,23 +24,23 @@ while IFS= read -r file; do
 
     lost=$(( before - after ))
     if (( lost > 4 )); then
-        SHRUNK+=("$file (${before} → ${after} lines, -${lost})")
+        SHRUNK+=("$file (${before} → ${after} Zeilen, -${lost})")
     fi
 done < <(git diff --name-only "${ORIG}..HEAD" 2>/dev/null)
 
 if (( ${#SHRUNK[@]} == 0 )); then
-    echo -e "${GREEN}[post-merge]${NC} No unexpected content loss."
+    echo -e "${GREEN}[post-merge]${NC} Kein unerwarteter Inhaltsverlust."
     exit 0
 fi
 
 echo
-echo -e "${RED}[post-merge] WARNING: The following files lost lines:${NC}"
+echo -e "${RED}[post-merge] WARNUNG: Folgende Dateien haben Zeilen verloren:${NC}"
 for entry in "${SHRUNK[@]}"; do
     echo -e "  ${YELLOW}!${NC}  $entry"
 done
 echo
-echo -e "${YELLOW}Please check:${NC}"
-echo "  git diff ${ORIG}..HEAD -- <file>"
+echo -e "${YELLOW}Bitte prüfen:${NC}"
+echo "  git diff ${ORIG}..HEAD -- <datei>"
 echo
-echo -e "${RED}DO NOT push until the loss has been investigated and confirmed OK!${NC}"
+echo -e "${RED}NICHT pushen bevor der Verlust untersucht und für OK befunden wurde!${NC}"
 echo

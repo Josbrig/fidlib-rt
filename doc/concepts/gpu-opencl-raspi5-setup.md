@@ -1,18 +1,18 @@
-# GPU Compute and OpenCL on the Raspberry Pi 5 — Setup Analysis
+# GPU-Compute und OpenCL auf dem Raspberry Pi 5 — Setup-Analyse
 
-Date: 2026-05-28  
+Stand: 2026-05-28  
 System: Raspberry Pi 5 Model B Rev 1.1, BCM2712, Cortex-A76, VideoCore VII (V3D 7.1)  
 OS: Debian Bookworm, Kernel 6.12.75+rpt-rpi-2712, Mesa 24.2.8-1~bpo12+rpt4
 
 ---
 
-## 1  Current State
+## 1  Ist-Zustand
 
-| Component | Status |
+| Komponente | Status |
 |---|---|
-| Vulkan Compute | **Working** — V3D 7.1.10.2, Mesa V3DV, Vulkan 1.2.289 |
-| OpenCL (Clover) | Installed, but **0 devices** — no `pipe_v3d.so` present |
-| OpenCL (Rusticl) | **Not included** in Debian package `mesa-opencl-icd` |
+| Vulkan Compute | **Funktioniert** — V3D 7.1.10.2, Mesa V3DV, Vulkan 1.2.289 |
+| OpenCL (Clover) | Installiert, aber **0 Devices** — kein `pipe_v3d.so` vorhanden |
+| OpenCL (Rusticl) | **Nicht enthalten** im Debian-Paket `mesa-opencl-icd` |
 
 ```
 $ clinfo
@@ -21,32 +21,32 @@ Number of devices 0
 → No devices found in platform
 ```
 
-`RUSTICL_ENABLE=v3d clinfo` also stays empty — Rusticl is not compiled into the
-installed `libMesaOpenCL.so.1.0.0` (0 Rusticl symbols).
+`RUSTICL_ENABLE=v3d clinfo` bleibt ebenfalls leer — Rusticl ist in der
+installierten `libMesaOpenCL.so.1.0.0` nicht kompiliert (0 Rusticl-Symbole).
 
 ---
 
-## 2  GPU Compute Without Additional Effort: Vulkan
+## 2  GPU-Compute ohne zusätzlichen Aufwand: Vulkan
 
-Vulkan Compute is **ready to use immediately**. The V3DV driver (Mesa) supports
-compute shaders via `VK_KHR_storage_buffer_storage_class` and general
-`vkCmdDispatch` execution.
+Vulkan Compute ist **sofort einsatzbereit**. Der V3DV-Treiber (Mesa) unterstützt
+Compute Shader via `VK_KHR_storage_buffer_storage_class` und allgemeine
+`vkCmdDispatch`-Ausführung.
 
-For this project, Vulkan Compute is the recommended GPU path. No further
-installation step needed.
+Für dieses Projekt ist Vulkan Compute der empfohlene GPU-Pfad. Kein weiterer
+Installationsschritt nötig.
 
 ---
 
-## 3  OpenCL via GPU: Building Rusticl from Mesa Sources
+## 3  OpenCL via GPU: Rusticl aus Mesa-Quellen bauen
 
-The only available method for real GPU OpenCL on the RPi 5 is a
-custom Mesa build with **Rusticl** backend enabled.
+Das einzige verfügbare Verfahren für echtes GPU-OpenCL auf dem RPi 5 ist ein
+eigener Mesa-Build mit aktiviertem **Rusticl**-Backend.
 
-Rusticl is the new Mesa OpenCL stack (from Mesa 22.3) that uses the Vulkan backend
-(here: V3DV) as the execution layer. The Debian backport does not include Rusticl,
-since the build requires a Rust toolchain and bindgen.
+Rusticl ist der neue Mesa-OpenCL-Stack (ab Mesa 22.3) der das Vulkan-Backend
+(hier: V3DV) als Ausführungsschicht nutzt. Der Debian-Backport enthält Rusticl
+nicht, da der Build eine Rust-Toolchain und bindgen voraussetzt.
 
-### 3.1  Build Dependencies
+### 3.1  Build-Abhängigkeiten
 
 ```bash
 sudo aptitude install \
@@ -61,17 +61,17 @@ sudo aptitude install \
   libwayland-dev wayland-protocols
 ```
 
-Estimated disk space for build: ~4 GB (sources + objects).
+Geschätzter Speicherbedarf für Build: ~4 GB (Quellen + Objekte).
 
-### 3.2  Mesa Source Code
+### 3.2  Mesa-Quellcode
 
 ```bash
 git clone https://gitlab.freedesktop.org/mesa/mesa.git
 cd mesa
-git checkout mesa-24.2.8    # same version as installed package
+git checkout mesa-24.2.8    # selbe Version wie das installierte Paket
 ```
 
-### 3.3  Configuration (minimal V3D + Rusticl build)
+### 3.3  Konfiguration (minimaler V3D + Rusticl Build)
 
 ```bash
 meson setup build \
@@ -85,43 +85,43 @@ meson setup build \
   --prefix=/usr/local
 ```
 
-Important options:
+Wichtige Optionen:
 
-| Option | Meaning |
+| Option | Bedeutung |
 |---|---|
-| `gallium-opencl=rusticl` | Rusticl instead of Clover (or `disabled`) |
-| `opencl-spirv=true` | SPIR-V kernel support (for OpenCL 3.0) |
-| `llvm=enabled` | LLVM backend for shader compilation |
-| `gallium-drivers=v3d,kmsro` | Only VideoCore VII + KMS render offload, no AMD/NVIDIA |
-| `vulkan-drivers=broadcom` | V3DV Vulkan driver (basis for Rusticl) |
+| `gallium-opencl=rusticl` | Rusticl statt Clover (oder `disabled`) |
+| `opencl-spirv=true` | SPIR-V-Kernel-Unterstützung (für OpenCL 3.0) |
+| `llvm=enabled` | LLVM-Backend für Shader-Kompilierung |
+| `gallium-drivers=v3d,kmsro` | Nur VideoCore VII + KMS render offload, keine AMD/NVIDIA |
+| `vulkan-drivers=broadcom` | V3DV Vulkan-Treiber (Basis für Rusticl) |
 
-### 3.4  Build and Installation
+### 3.4  Build und Installation
 
 ```bash
-ninja -C build -j$(nproc)        # ~1–2 hours on RPi 5
+ninja -C build -j$(nproc)        # ~1–2 Stunden auf RPi 5
 sudo ninja -C build install
 sudo ldconfig
 ```
 
-### 3.5  Register ICD
+### 3.5  ICD registrieren
 
-After the build, Rusticl must be registered as an OpenCL ICD:
+Nach dem Build muss Rusticl als OpenCL-ICD bekannt gemacht werden:
 
 ```bash
-# Check if Rusticl ICD was created automatically:
+# Prüfen ob Rusticl-ICD automatisch erstellt wurde:
 ls /usr/local/etc/OpenCL/vendors/
 
-# If not, create manually:
+# Falls nicht, manuell anlegen:
 echo "libRusticlOpenCL.so.1" | sudo tee /etc/OpenCL/vendors/rusticl.icd
 ```
 
-### 3.6  Verification
+### 3.6  Verifikation
 
 ```bash
 RUSTICL_ENABLE=v3d clinfo
 ```
 
-Expected output (after successful build):
+Erwartete Ausgabe (nach erfolgreichem Build):
 
 ```
 Platform Name     Rusticl
@@ -134,40 +134,40 @@ Number of devices 1
 
 ---
 
-## 4  Limitations Even After a Successful Rusticl Build
+## 4  Einschränkungen auch nach erfolgreichem Rusticl-Build
 
-| Limitation | Details |
+| Einschränkung | Details |
 |---|---|
-| **No FP64** | VideoCore VII has no native FP64 — Rusticl cannot change this |
-| **OpenCL 3.0, not complete** | Rusticl on V3D does not support all optional 3.0 features |
-| **Only FP32 kernels sensible** | FP64 emulation ~8–16× slower than FP32 |
-| **No `cl_khr_fp64`** | `double` not usable in OpenCL kernels |
-| **Experimental** | Rusticl on V3D is production-ready, but less tested than V3DV (Vulkan) |
+| **Kein FP64** | VideoCore VII hat kein natives FP64 — auch Rusticl kann das nicht ändern |
+| **OpenCL 3.0, nicht vollständig** | Rusticl auf V3D unterstützt nicht alle optionalen 3.0-Features |
+| **Nur FP32-Kernel sinnvoll** | FP64-Emulation ~8–16× langsamer als FP32 |
+| **Kein `cl_khr_fp64`** | `double` in OpenCL-Kerneln nicht nutzbar |
+| **Experimentell** | Rusticl auf V3D ist produktionsreif, aber weniger getestet als V3DV (Vulkan) |
 
 ---
 
-## 5  Comparison of GPU Compute Paths
+## 5  Gegenüberstellung der GPU-Compute-Wege
 
 | | Vulkan Compute | OpenCL (Rusticl) |
 |---|---|---|
-| **Available** | Immediately | After custom Mesa build (~2 h) |
-| **Driver** | V3DV (Mesa, stable) | Rusticl via V3DV (Mesa, experimental) |
+| **Verfügbar** | Sofort | Nach Mesa-Eigenbau (~2 h) |
+| **Treiber** | V3DV (Mesa, stabil) | Rusticl über V3DV (Mesa, experimentell) |
 | **API** | Vulkan 1.2 | OpenCL 3.0 (subset) |
-| **FP32** | Yes | Yes |
-| **FP64** | No | No |
-| **Portability** | RPi 4/5, desktop (Vulkan) | RPi 5 (Rusticl), desktop (AMD/NVIDIA) |
-| **Maintenance effort** | None (package) | Custom build required on Mesa updates |
-| **Recommendation** | Primary path | Only if OpenCL portability specifically needed |
+| **FP32** | Ja | Ja |
+| **FP64** | Nein | Nein |
+| **Portabilität** | RPi 4/5, Desktop (Vulkan) | RPi 5 (Rusticl), Desktop (AMD/NVIDIA) |
+| **Wartungsaufwand** | Kein (Paket) | Eigener Build bei Mesa-Updates nötig |
+| **Empfehlung** | Primärer Pfad | Nur wenn OpenCL-Portabilität konkret benötigt |
 
 ---
 
-## 6  Recommendation
+## 6  Empfehlung
 
-For this project (fidlib GPU acceleration):
+Für dieses Projekt (fidlib GPU-Beschleunigung):
 
-**Vulkan Compute first** — already installed, stable, no additional effort.  
-The Rusticl Mesa build is only worthwhile if:
+**Vulkan Compute zuerst** — bereits installiert, stabil, kein Zusatzaufwand.  
+Der Rusticl-Mesa-Build lohnt sich nur wenn:
 
-- existing OpenCL kernels are to be ported (reuse of `.cl` files), or
-- a desktop system also needs to be served via OpenCL (AMD/NVIDIA have better OpenCL support than Vulkan Compute on their platforms), or
-- future Debian packages include Rusticl — then the custom build effort falls away.
+- bestehende OpenCL-Kernels portiert werden sollen (Wiederverwendung von `.cl`-Dateien), oder
+- ein Desktop-System ebenfalls über OpenCL bedient werden soll (AMD/NVIDIA haben besseren OpenCL-Support als Vulkan Compute auf deren Plattformen), oder
+- künftige Debian-Pakete Rusticl enthalten — dann fällt der Eigenaufwand weg.

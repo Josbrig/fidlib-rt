@@ -1,50 +1,50 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
-# Installation Guide — Raspberry Pi 4
+# Installationsanleitung — Raspberry Pi 4
 
-**Platform:** Raspberry Pi 4 Model B (BCM2711, aarch64)
+**Plattform:** Raspberry Pi 4 Model B (BCM2711, aarch64)
 **OS:** Raspberry Pi OS Bookworm (Debian 12)
-**GPU:** VideoCore VI (V3D 4.2) — no Vulkan Compute, no OpenCL
+**GPU:** VideoCore VI (V3D 4.2) — kein Vulkan Compute, kein OpenCL
 
-## What can be enabled after installation?
+## Was ist nach der Installation aktivierbar?
 
-| Feature | Status | Note |
-|---------|--------|------|
-| `FIDLIB_SIMD=ON` | immediately | NEON is always available on AArch64 |
-| `FIDLIB_FFT=ON` | immediately | Overlap-Save + FFTW3 backend |
-| `FIDLIB_VULKAN=ON` | not useful | V3D 4.2 has no Vulkan Compute support |
-| `FIDLIB_OPENCL=ON` | not available | No working OpenCL driver for V3D 4.2 |
+| Feature | Status | Bemerkung |
+|---------|--------|-----------|
+| `FIDLIB_SIMD=ON` | sofort | NEON ist auf AArch64 immer verfügbar |
+| `FIDLIB_FFT=ON` | sofort | Overlap-Save + FFTW3-Backend |
+| `FIDLIB_VULKAN=ON` | nicht sinnvoll | V3D 4.2 hat keinen Vulkan-Compute-Support |
+| `FIDLIB_OPENCL=ON` | nicht verfügbar | Kein funktionierender OpenCL-Treiber für V3D 4.2 |
 
-> **GPU compute limitation:** The VideoCore VI (V3D 4.2) in the BCM2711 does
-> support Vulkan for graphics (Mesa V3DV since Mesa 21), but **Vulkan Compute Pipelines**
-> (`VkComputePipeline`) are not available. The cmake system automatically sets `FIDLIB_VULKAN`
-> to `OFF` when the driver reports no compute capability.
-> For GPU compute: use RPi 5 (VideoCore VII) or a desktop PC.
+> **GPU-Compute-Einschränkung:** Der VideoCore VI (V3D 4.2) im BCM2711 unterstützt
+> zwar Vulkan für Grafik (Mesa V3DV ab Mesa 21), aber **Vulkan Compute Pipelines**
+> (`VkComputePipeline`) sind nicht verfügbar. Das cmake-System setzt `FIDLIB_VULKAN`
+> automatisch auf `OFF`, wenn der Treiber keine Compute-Fähigkeiten meldet.
+> Für GPU-Compute: RPi 5 (VideoCore VII) oder Desktop-PC verwenden.
 
 ---
 
-## Option A — Using the install script
+## Option A — Mit dem Install-Script
 
 ```bash
 chmod +x scripts/install-deps-raspi4.sh
 bash scripts/install-deps-raspi4.sh
 ```
 
-The script checks the BCM2711 SoC, shows packages, simulates, and asks for confirmation.
+Das Script prüft BCM2711-SoC, zeigt Pakete, simuliert und fragt nach Bestätigung.
 
 ---
 
-## Option B — Manual installation
+## Option B — Manuelle Installation
 
-### Step 1: Install aptitude
+### Schritt 1: aptitude installieren
 
 ```bash
 sudo apt-get update
 sudo apt-get install aptitude
 ```
 
-### Step 2: Build base
+### Schritt 2: Build-Basis
 
 ```bash
 sudo aptitude install -y \
@@ -53,10 +53,10 @@ sudo aptitude install -y \
     git \
     pkg-config
 
-cmake --version   # must be >= 3.16
+cmake --version   # muss >= 3.16 sein
 ```
 
-### Step 3: SDL2 build dependencies
+### Schritt 3: SDL2-Build-Abhängigkeiten
 
 ```bash
 sudo aptitude install -y \
@@ -65,26 +65,26 @@ sudo aptitude install -y \
     libgl1-mesa-dev libasound2-dev libpulse-dev
 ```
 
-### Step 4: FFTW3
+### Schritt 4: FFTW3
 
 ```bash
 sudo aptitude install -y libfftw3-dev
-pkg-config --modversion fftw3   # version check
+pkg-config --modversion fftw3   # Versions-Check
 ```
 
-### Step 5: Documentation (optional)
+### Schritt 5: Dokumentation (optional)
 
 ```bash
 sudo aptitude install -y doxygen graphviz
 ```
 
-> **No step for Vulkan/OpenCL** — these features are not available on RPi 4.
+> **Kein Schritt für Vulkan/OpenCL** — diese Features sind auf RPi 4 nicht verfügbar.
 
 ---
 
-## cmake build after installation
+## cmake-Build nach der Installation
 
-### Standard build (NEON + FFT — recommended configuration)
+### Standard-Build (NEON + FFT — empfohlene Konfiguration)
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -96,13 +96,13 @@ cmake --build build_raspi4 -j$(nproc)
 ctest --test-dir build_raspi4 --output-on-failure
 ```
 
-Expected cmake output:
+Erwartete cmake-Ausgabe:
 ```
 -- fidlib SIMD: NEON (aarch64)
 -- fidlib FFT: Overlap-Save + FFTW3 3.x.x
 ```
 
-### Debug build
+### Debug-Build
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug \
@@ -125,33 +125,33 @@ cmake --build build_bench --target bench_fir_backends -j$(nproc)
 ./build_bench/bin/bench_fir_backends
 ```
 
-### What happens if you set `FIDLIB_VULKAN=ON` anyway?
+### Was passiert wenn man `FIDLIB_VULKAN=ON` trotzdem setzt?
 
-cmake automatically detects that no suitable Vulkan Compute driver is present
-and disables the feature with a warning:
+cmake erkennt automatisch, dass kein geeigneter Vulkan-Compute-Treiber vorhanden ist,
+und deaktiviert das Feature mit einer Warnung:
 
 ```
--- WARNING: fidlib VULKAN: Vulkan not found — FIDLIB_VULKAN disabled
+-- WARNING: fidlib VULKAN: Vulkan nicht gefunden — FIDLIB_VULKAN deaktiviert
 ```
 
-There is no build error — the system falls back safely to NEON/FFT.
+Es gibt keinen Build-Fehler — das System fällt sicher auf NEON/FFT zurück.
 
 ---
 
-## Expected performance RPi 4
+## Leistungserwartung RPi 4
 
-With NEON + FFTW3-FFT:
-- Direct convolution (< 512 taps): ~20–30 million samples/s (NEON FP64)
-- Overlap-Save FFT (≥ 512 taps): significantly faster than O(N²) direct convolution
-- FP32 mode (`-DFIDLIB_PRECISION=float`): ~2× faster than FP64 for FIR
+Mit NEON + FFTW3-FFT:
+- Direkte Faltung (< 512 Taps): ~20–30 Millionen Samples/s (NEON FP64)
+- Overlap-Save FFT (≥ 512 Taps): deutlich schneller als O(N²)-Direktfaltung
+- FP32-Modus (`-DFIDLIB_PRECISION=float`): ~2× schneller als FP64 bei FIR
 
 ---
 
-## Troubleshooting
+## Problemlösungen
 
-| Problem | Cause | Solution |
-|---------|-------|---------|
-| `cmake` cannot find `fftw3` | `libfftw3-dev` missing | `sudo aptitude install libfftw3-dev` |
-| SDL2 configure error | X11/audio headers missing | Repeat step 3 |
-| `aptitude` missing | Not pre-installed | `sudo apt-get install aptitude` |
-| cmake reports `FIDLIB_VULKAN` disabled | V3D 4.2 without compute | Expected — no action needed |
+| Problem | Ursache | Lösung |
+|---------|---------|--------|
+| `cmake` findet `fftw3` nicht | `libfftw3-dev` fehlt | `sudo aptitude install libfftw3-dev` |
+| SDL2-Configure-Fehler | X11/Audio-Header fehlen | Schritt 3 wiederholen |
+| `aptitude` fehlt | Nicht vorinstalliert | `sudo apt-get install aptitude` |
+| cmake meldet `FIDLIB_VULKAN` deaktiviert | V3D 4.2 ohne Compute | Erwartet — kein Handlungsbedarf |

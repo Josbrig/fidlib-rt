@@ -1,49 +1,49 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
-# Installation Guide — Raspberry Pi 3 / Zero 2 W
+# Installationsanleitung — Raspberry Pi 3 / Zero 2 W
 
-**Platform:** Raspberry Pi 3B / 3B+ / Zero 2 W (BCM2837 / BCM2710, aarch64)
+**Plattform:** Raspberry Pi 3B / 3B+ / Zero 2 W (BCM2837 / BCM2710, aarch64)
 **OS:** Raspberry Pi OS Bookworm (Debian 12)
-**GPU:** VideoCore IV — no Vulkan, no OpenCL
+**GPU:** VideoCore IV — kein Vulkan, kein OpenCL
 
-## What can be enabled after installation?
+## Was ist nach der Installation aktivierbar?
 
-| Feature | Status | Note |
-|---------|--------|------|
-| `FIDLIB_SIMD=ON` | immediately | NEON on AArch64 |
-| `FIDLIB_FFT=ON` | immediately | Overlap-Save + FFTW3 |
-| `FIDLIB_VULKAN=ON` | not available | VideoCore IV without Vulkan |
-| `FIDLIB_OPENCL=ON` | not available | VideoCore IV without OpenCL |
+| Feature | Status | Bemerkung |
+|---------|--------|-----------|
+| `FIDLIB_SIMD=ON` | sofort | NEON auf AArch64 |
+| `FIDLIB_FFT=ON` | sofort | Overlap-Save + FFTW3 |
+| `FIDLIB_VULKAN=ON` | nicht verfügbar | VideoCore IV ohne Vulkan |
+| `FIDLIB_OPENCL=ON` | nicht verfügbar | VideoCore IV ohne OpenCL |
 
-> **Zero 2 W note:** Only 512 MB RAM. Large FFT blocks
-> (`FIDLIB_FFT_THRESHOLD` > 512) can cause memory pressure.
-> Recommendation: keep threshold at 256 or lower.
+> **Zero 2 W-Besonderheit:** Nur 512 MB RAM. Große FFT-Blöcke
+> (`FIDLIB_FFT_THRESHOLD` > 512) können unter Speicherdruck führen.
+> Empfehlung: Threshold auf 256 belassen oder reduzieren.
 
 ---
 
-## Option A — Using the install script
+## Option A — Mit dem Install-Script
 
 ```bash
 chmod +x scripts/install-deps-raspi3.sh
 bash scripts/install-deps-raspi3.sh
 ```
 
-The script automatically detects low RAM (< 700 MB → Zero 2 W) and prints
-a corresponding notice.
+Das Script erkennt automatisch wenig RAM (< 700 MB → Zero 2 W) und gibt einen
+entsprechenden Hinweis aus.
 
 ---
 
-## Option B — Manual installation
+## Option B — Manuelle Installation
 
-### Step 1: Install aptitude
+### Schritt 1: aptitude installieren
 
 ```bash
 sudo apt-get update
 sudo apt-get install aptitude
 ```
 
-### Step 2: Build base
+### Schritt 2: Build-Basis
 
 ```bash
 sudo aptitude install -y \
@@ -52,10 +52,10 @@ sudo aptitude install -y \
     git \
     pkg-config
 
-cmake --version   # must be >= 3.16
+cmake --version   # muss >= 3.16 sein
 ```
 
-### Step 3: SDL2 build dependencies
+### Schritt 3: SDL2-Build-Abhängigkeiten
 
 ```bash
 sudo aptitude install -y \
@@ -64,13 +64,13 @@ sudo aptitude install -y \
     libgl1-mesa-dev libasound2-dev libpulse-dev
 ```
 
-### Step 4: FFTW3
+### Schritt 4: FFTW3
 
 ```bash
 sudo aptitude install -y libfftw3-dev
 ```
 
-### Step 5: Documentation (optional)
+### Schritt 5: Dokumentation (optional)
 
 ```bash
 sudo aptitude install -y doxygen graphviz
@@ -78,9 +78,9 @@ sudo aptitude install -y doxygen graphviz
 
 ---
 
-## cmake build after installation
+## cmake-Build nach der Installation
 
-### Standard RPi 3 build (NEON + FFT)
+### Standard-Build RPi 3 (NEON + FFT)
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -92,10 +92,10 @@ cmake --build build_raspi3 -j$(nproc)
 ctest --test-dir build_raspi3 --output-on-failure
 ```
 
-### Zero 2 W — low-memory build
+### Zero 2 W — Low-Memory-Build
 
-The FFT threshold determines how many taps are required before the overlap-save
-engine is activated. A lower value reduces memory usage per filter instance:
+Der FFT-Threshold bestimmt, ab wie vielen Taps die Overlap-Save-Engine aktiviert
+wird. Ein niedrigerer Wert reduziert den Speicherbedarf pro Filter-Instanz:
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -104,7 +104,7 @@ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
       -DFIDLIB_FFT_THRESHOLD=256 \
       -S . -B build_zero2
 
-cmake --build build_zero2 -j2   # -j2 due to 512 MB RAM
+cmake --build build_zero2 -j2   # -j2 wegen 512 MB RAM
 ```
 
 ### Benchmark
@@ -118,29 +118,29 @@ cmake --build build_bench --target bench_fir_backends -j$(nproc)
 ./build_bench/bin/bench_fir_backends
 ```
 
-> **Note for Zero 2 W:** The benchmark also runs on 512 MB RAM —
-> it only measures short bursts and does not allocate large buffers.
+> **Hinweis für Zero 2 W:** Der Benchmark läuft auch auf 512 MB RAM durch —
+> er misst nur kurze Bursts und allokiert keine riesigen Buffer.
 
 ---
 
-## Memory reference values
+## Speicher-Richtwerte
 
-| Configuration | Memory per filter instance |
+| Konfiguration | Speicher pro Filter-Instanz |
 |---|---|
-| Direct convolution 64 taps (FP64) | ~1 KB |
-| Direct convolution 512 taps (FP64) | ~4 KB |
-| OLA/FFT 1024 taps, N=2048 | ~128 KB (FFT buffer) |
-| OLA/FFT 4096 taps, N=8192 | ~512 KB |
+| Direktfaltung 64 Taps (FP64) | ~1 KB |
+| Direktfaltung 512 Taps (FP64) | ~4 KB |
+| OLA/FFT 1024 Taps, N=2048 | ~128 KB (FFT-Buffer) |
+| OLA/FFT 4096 Taps, N=8192 | ~512 KB |
 
-For Zero 2 W: threshold ≤ 256 and tap count ≤ 1024 recommended.
+Für Zero 2 W: Threshold ≤ 256 und Tap-Anzahl ≤ 1024 empfohlen.
 
 ---
 
-## Troubleshooting
+## Problemlösungen
 
-| Problem | Cause | Solution |
-|---------|-------|---------|
-| Build aborts with OOM | Not enough RAM during linking | `cmake --build ... -j2` instead of `-j$(nproc)` |
-| `cmake --version` < 3.16 | Old cmake version | `sudo aptitude install cmake` (Bookworm has 3.25+) |
-| `FIDLIB_VULKAN` is ignored | V3D IV without compute | Expected — no action needed |
-| fftw3 not found | `libfftw3-dev` missing | `sudo aptitude install libfftw3-dev` |
+| Problem | Ursache | Lösung |
+|---------|---------|--------|
+| Build bricht mit OOM ab | Zu wenig RAM beim Linken | `cmake --build ... -j2` statt `-j$(nproc)` |
+| `cmake --version` < 3.16 | Alte cmake-Version | `sudo aptitude install cmake` (Bookworm hat 3.25+) |
+| `FIDLIB_VULKAN` wird ignoriert | V3D IV ohne Compute | Erwartet — kein Handlungsbedarf |
+| fftw3 nicht gefunden | `libfftw3-dev` fehlt | `sudo aptitude install libfftw3-dev` |

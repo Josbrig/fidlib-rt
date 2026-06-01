@@ -1,10 +1,10 @@
 /*
- * test_firun_sil.c — SIL tests for firun as a black box (popen)
+ * test_firun_sil.c — SIL tests for firun as black-box (popen)
  *
- * Covers: impulse response, frequency response (-r), format round-trip (float64),
- *         multi-channel (-n 2).
+ * Deckt ab: Impulsantwort, Frequenzgang (-r), Format Round-Trip (float64),
+ *           Mehrkanaligkeit (-n 2).
  *
- * firun syntax: firun [options] <rate> <in/out-format> <filter...>
+ * firun Syntax: firun [options] <rate> <in/out-format> <filter...>
  * Note: options (-d, -r, -n) MUST come before <rate>.
  *
  * FIRUN_BIN is passed as -DFIRUN_BIN="..." (CMake).

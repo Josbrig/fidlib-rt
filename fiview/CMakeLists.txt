@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-only
-# Copyright (C) 2025-2026 Kai Dieki (cmake build system)
+# Copyright (C) 2025-2026 Jörg Simbrig (cmake build system)
 # fiview sources: Copyright (C) 2002-2003 Jim Peters <jim@uazu.net>, GPL-2.0-only
 include(ExternalProject)
 
-option(FIVIEW_USE_SDL2      "Build fiview against SDL2 instead of SDL 1.2"  ON)
-option(FIVIEW_CXX20_COMPAT  "Compile fiview with C++20 compiler"           ON)
-option(FIVIEW_SDL_UPSTREAM  "Fetch SDL from upstream GitHub"                ON)
-
+option(FIVIEW_USE_SDL2      "Build fiview against SDL2 instead of SDL 1.2"    ON)
+option(FIVIEW_CXX20_COMPAT  "Compile fiview with C++20 compiler"     ON)
 set(_SDL2_REPO  "https://github.com/libsdl-org/SDL.git")
 set(_SDL12_REPO "https://github.com/libsdl-org/SDL-1.2.git")
 
@@ -129,10 +127,10 @@ else()
   set(SDL_CDEF       "")
   set(SDL_EXTRA_LIBS ${_SDL_EXTRA_BASE})
   message(STATUS
-    "LICENSE: SDL 1.2 is LGPL-2.1-or-later. Static linking requires distributing "
-    "object files or build instructions (LGPL §6) so users can relink SDL. "
-    "Source code + CMake build in this repo satisfy this obligation. "
-    "When redistributing binaries: include object files or point to this repo.")
+    "LICENSE: SDL 1.2 ist LGPL-2.1-or-later. Statisches Linken verpflichtet zur "
+    "Weitergabe von Objektdateien oder Build-Anleitung (LGPL §6), damit Nutzer SDL "
+    "austauschen koennen. Quellcode + CMake-Build in diesem Repo erfuellen diese Pflicht. "
+    "Weiterverteilung von Binaries: Objektdateien beilegen oder auf dieses Repo verweisen.")
 endif()
 
 # fiview includes <fidlib/fidlib.h> — redirect to our lib target

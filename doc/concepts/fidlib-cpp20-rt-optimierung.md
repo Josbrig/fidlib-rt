@@ -1,139 +1,143 @@
-# Concept: fidlib — C++20 Compilability, Realtime Safety, Security
+# Konzept: fidlib — C++20-Kompilierbarkeit, Realtime-Tauglichkeit, Sicherheit
 
-## Goal
+## Ziel
 
-fidlib is written in C99. The goal is **not** to port it to C++20, but to:
+fidlib ist in C99 geschrieben. Ziel ist **nicht** eine Portierung nach C++20,
+sondern:
 
-1. Make the existing C code compilable with a C++20 compiler (`-std=c++20`)
-   — without restructuring the logic.
-2. Use insights gained from C++20 analysis to selectively improve
-   security, performance, and realtime safety.
+1. Den bestehenden C-Code mit einem C++20-Compiler (`-std=c++20`) übersetzbar
+   machen — ohne Umbau der Logik.
+2. Die durch C++20-Analyse gewonnenen Erkenntnisse nutzen, um gezielt
+   Sicherheit, Geschwindigkeit und Realtime-Tauglichkeit zu verbessern.
 
 ---
 
-## Phase 1 — Establishing C++20 Compilability
+## Phase 1 — C++20-Kompilierbarkeit herstellen
 
-The C++20 compiler is stricter than C99 and enforces correctness that was
-silently tolerated by the C compiler. The goal of this phase is a **clean
-build without `-fpermissive`**.
+Der C++20-Compiler ist strenger als C99 und erzwingt Korrektheit, die im
+C-Compiler still toleriert wurde. Das Ziel dieser Phase ist ein **sauberer
+Build ohne `-fpermissive`**.
 
-### Known Obstacles in fidlib.c
+### Bekannte Hürden in fidlib.c
 
-| Problem | Location | C++20 Error |
+| Problem | Ort | C++20-Fehler |
 |---|---|---|
-| Implicit `void *` casts | `Alloc()`, `fid_run_newbuf()` | `error: invalid conversion from 'void*'` |
-| `error()` — `exit()` without `[[noreturn]]` | `fidlib.c:253` | Compiler cannot prove no UB follows |
-| Flexible array members (`double buf[0]`) | `fidrf_combined.h` | Not standard in C++ (extension) |
-| VLA usage (if still present) | various | Forbidden in C++ |
-| C-style casts | various | Warning → error with `-Werror` |
-| `register` keyword | `fidrf_cmdlist.h` | Deprecated in C++17, removed in C++20 (UB as storage class) |
-| Implicit `int` return types | older locations | Error in C++ |
+| `void *`-Casts implizit | `Alloc()`, `fid_run_newbuf()` | `error: invalid conversion from 'void*'` |
+| `error()` — `exit()` ohne `[[noreturn]]` | `fidlib.c:253` | Compiler kann nicht beweisen dass danach kein UB folgt |
+| Flexible Array Members (`double buf[0]`) | `fidrf_combined.h` | In C++ nicht standard (extension) |
+| VLA-Nutzung (falls noch vorhanden) | div. | In C++ verboten |
+| C-Style Casts | div. | Warnung → Fehler bei `-Werror` |
+| `register`-Keyword | `fidrf_cmdlist.h` | Deprecated in C++17, entfernt in C++20 (UB als Storage Class) |
+| Implizite `int`-Rückgabetypen | alt. Stellen | Fehler in C++ |
 
-### Measures for Phase 1
+### Maßnahmen Phase 1
 
 ```
-- Make all void* casts explicit (static_cast<T*> or C-cast in extern "C" block)
-- Annotate error() with [[noreturn]] (C23/GCC attribute, portable wrapper)
-- double buf[0] → double buf[1] or std::array (only when compiling as C++)
-- Remove register keyword (has had no effect since GCC 7+)
-- extern "C" guards in fidlib.h are already present (JamesHight fork)
+- Alle void*-Casts explizit machen (static_cast<T*> oder C-Cast im extern "C"-Block)
+- error() mit [[noreturn]] annotieren (C23/GCC-Attribut, portable Wrapper)
+- double buf[0] → double buf[1] oder std::array (nur wenn in C++ kompiliert)
+- register-Keyword entfernen (ohnehin ohne Wirkung seit GCC 7+)
+- extern "C" Guards in fidlib.h sind bereits vorhanden (JamesHight-Fork)
 ```
 
-**Build flag for Phase 1:**
+**Build-Flag für Phase 1:**
 ```cmake
-# In lib/CMakeLists.txt, option for C++ compilation:
+# In lib/CMakeLists.txt, Option für C++-Compile:
 target_compile_options(fidlib PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++20>)
 ```
 
-Alternatively: the `.c` files as `.cpp` with `set_source_files_properties(... LANGUAGE CXX)`.
+Alternativ: die `.c`-Dateien als `.cpp` mit `set_source_files_properties(... LANGUAGE CXX)`.
 
 ---
 
-## Phase 2 — Security Hardening (derived from C++20 analysis)
+## Phase 2 — Sicherheits-Hardening (aus C++20-Analyse gewonnen)
 
-### 2.1 `error()` — no abort in the RT path
+### 2.1 `error()` — kein Abort im RT-Pfad
 
-**Problem:** `error()` in `fidlib.c:253` calls `exit()`. This is catastrophic
-in a realtime context (audio thread, embedded).
+**Problem:** `error()` in `fidlib.c:253` ruft `exit()` auf. Das ist in einem
+Realtime-Kontext (Audio-Thread, Embedded) katastrophal.
 
 ```c
-// Current:
+// Aktuell:
 static void error(char *fmt, ...) { ... exit(1); }
 ```
 
-**Solution:** Make error handling separable via callback:
+**Lösung:** Fehlerbehandlung über Callback trennbar machen:
 
 ```c
 typedef void (*FidErrorFunc)(const char *msg, void *userdata);
 void fid_set_error_handler(FidErrorFunc fn, void *userdata);
 ```
 
-Default handler remains `exit()` for existing users. RT users set
-their own handler (e.g., sets an error flag and returns a null filter).
+Default-Handler bleibt `exit()` für bestehende Nutzer. RT-Nutzer setzen
+einen eigenen Handler (z.B. setzt ein Fehler-Flag und gibt einen
+Null-Filter zurück).
 
-### 2.2 `const` Correctness
+### 2.2 `const`-Korrektheit
 
-The JamesHight fork already has `const char *spec`. Beyond that:
+Der JamesHight-Fork hat `const char *spec` bereits. Darüber hinaus:
 
-- `fid_response()`, `fid_response_pha()`: `filt` parameter as `const FidFilter *`
-- All read-only coefficient pointers in `RunBuf` as `const double *`
+- `fid_response()`, `fid_response_pha()`: `filt`-Parameter als `const FidFilter *`
+- Alle read-only Koeffizient-Pointer in `RunBuf` als `const double *`
 
-### 2.3 Integer Overflow / Size Checks
+### 2.3 Integer-Overflow / Größen-Checks
 
-`FFCSIZE(n, m)` calculates allocation sizes. No overflow check.
-C++20 `std::numeric_limits` / `__builtin_add_overflow` as portable wrapper.
+`FFCSIZE(n, m)` berechnet Allokationsgrößen. Kein Overflow-Check.
+C++20-`std::numeric_limits` / `__builtin_add_overflow` als portabler Wrapper.
 
 ---
 
-## Phase 3 — Realtime Safety
+## Phase 3 — Realtime-Tauglichkeit
 
-### 3.1 No `malloc` in the Hot Path
+### 3.1 Kein `malloc` im Hot Path
 
-**Currently:** `fid_run_newbuf()` and `fid_run_initbuf()` call `calloc()`.
-This is acceptable for design time, but `fid_run_newbuf()` must **not**
-be called in the audio thread.
+**Aktuell:** `fid_run_newbuf()` und `fid_run_initbuf()` rufen `calloc()` auf.
+Das ist für Design-Zeit akzeptabel, aber `fid_run_newbuf()` darf **nicht**
+im Audio-Thread aufgerufen werden.
 
-**Strategy:** Documentation + API annotation (no code restructuring needed):
-- `fid_design()`, `fid_run_new()`, `fid_run_newbuf()` → "alloc phase" (not RT-safe)
-- `funcp(buf, sample)` → "run phase" (RT-safe, zero-alloc)
+**Strategie:** Dokumentation + API-Annotation (kein Code-Umbau nötig):
+- `fid_design()`, `fid_run_new()`, `fid_run_newbuf()` → "Alloc-Phase" (nicht RT-safe)
+- `funcp(buf, sample)` → "Run-Phase" (RT-safe, zero-alloc)
 
-Long-term: `fid_run_newbuf_inplace(void *run, void *mem, size_t len)` —
-initialize buffer in pre-allocated memory (arena/pool compatible).
+Langfristig: `fid_run_newbuf_inplace(void *run, void *mem, size_t len)` —
+Buffer in vorallokiertem Speicher initialisieren (Arena/Pool-kompatibel).
 
-### 3.2 Cache-Friendly Layout
+### 3.2 Cache-Freundliches Layout
 
-`RunBuf` contains `double *coef` and `double *cmd` as pointers to separate
-memory regions. The hot path in `filter_step()` jumps between three
-memory regions:
-
-```
-RunBuf.coef  →  [somewhere in heap]
-RunBuf.cmd   →  [somewhere in heap]
-RunBuf.buf   →  [directly after RunBuf — already the case after our fix]
-```
-
-**Optimization:** Allocate `coef` and `cmd` together with `buf` in one
-contiguous block:
+`RunBuf` enthält `double *coef` und `double *cmd` als Pointer auf getrennte
+Speicherbereiche. Der Hot-Path in `filter_step()` sprintet zwischen drei
+Speicherregionen:
 
 ```
-[ RunBuf header | coef[] | cmd[] | buf[] ]
+RunBuf.coef  →  [irgendwo im Heap]
+RunBuf.cmd   →  [irgendwo im Heap]
+RunBuf.buf   →  [direkt hinter RunBuf — bereits so, nach unserem Fix]
 ```
 
-This places the entire filter state in one cache line group.
-`fid_run_newbuf()` can allocate this directly with the known layout.
+**Optimierung:** `coef` und `cmd` zusammen mit `buf` in einem zusammenhängenden
+Block allozieren:
 
-### 3.3 `filter_step()` — Branch Reduction
+```
+[ RunBuf-Header | coef[] | cmd[] | buf[] ]
+```
 
-The command list in `fidrf_cmdlist.h` works through the coefficients with a
-`switch/char` dispatch. This is fast, but the dispatch loop has branches.
+Damit liegt der gesamte Filter-State in einer Cache-Line-Gruppe.
+`fid_run_newbuf()` kann das bei bekanntem Layout direkt so allozieren.
 
-For C++20: `constexpr` unrolling for known filter orders (biquad,
-4th order etc.) as template specializations — without touching the C path.
+### 3.3 `filter_step()` — Branch-Reduktion
 
-### 3.4 Compiler Hints
+Die Command-List in `fidrf_cmdlist.h` arbeitet sich mit einem `switch/char`
+durch die Koeffizienten. Das ist schnell, aber der Dispatch-Loop hat
+Branches.
+
+Für C++20: `constexpr`-Unrolling für bekannte Filterordnungen (Biquad,
+4. Ordnung etc.) als Template-Spezialisierungen möglich — ohne den
+C-Pfad zu berühren.
+
+### 3.4 Compiler-Hints
 
 ```c
-// Portable wrapper for __builtin_expect:
+// Portabler Wrapper für __builtin_expect:
 #if defined(__GNUC__) || defined(__clang__)
 #  define FID_LIKELY(x)   __builtin_expect(!!(x), 1)
 #  define FID_UNLIKELY(x) __builtin_expect(!!(x), 0)
@@ -143,11 +147,11 @@ For C++20: `constexpr` unrolling for known filter orders (biquad,
 #endif
 ```
 
-Apply in `filter_step()` to the `END` command (most frequent exit).
+Anwenden in `filter_step()` auf den `END`-Befehl (häufigster Exit).
 
 ---
 
-## Phase 4 — Performance
+## Phase 4 — Geschwindigkeit
 
 ### 4.1 Link-Time Optimization (LTO)
 
@@ -155,49 +159,49 @@ Apply in `filter_step()` to the `END` command (most frequent exit).
 set_property(TARGET fidlib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 ```
 
-Especially effective for `filter_step()`, since the function is always
-called through a function pointer — LTO can devirtualize this.
+Wirkt besonders bei `filter_step()`, da die Funktion immer über einen
+Funktionspointer aufgerufen wird — LTO kann das devirtualisieren.
 
-### 4.2 `-O3 -ffast-math` for the Hot-Path Files
+### 4.2 `-O3 -ffast-math` für die Hot-Path-Dateien
 
-`ffast-math` is generally safe for audio processing (no NaN/Inf
-in normal operation). Scope only to `fidrf_cmdlist.h`/`fidlib.c`, not globally.
+`ffast-math` ist für Audioverarbeitung in der Regel sicher (keine NaN/Inf
+im Normalfall). Nur für `fidrf_cmdlist.h`/`fidlib.c` scopen, nicht global.
 
-### 4.3 SIMD (long-term)
+### 4.3 SIMD (langfristig)
 
-For multi-channel processing (N channels in parallel): NEON (ARM) / SSE2 (x86)
-via compiler auto-vectorization — requires struct-of-arrays instead of
-array-of-structs for the buffers. Scope: separate feature ticket.
-
----
-
-## Implementation Order
-
-```
-1. Phase 1: C++20 compilability (blocker for all further analyses)
-2. Phase 2.1: Decouple error() handler (RT prerequisite)
-3. Phase 2.2: Complete const correctness
-4. Phase 3.1: Document alloc phase / run phase + inplace API
-5. Phase 3.2: Consolidate cache layout
-6. Phase 3.3+3.4: Compiler hints + filter_step optimization
-7. Phase 4: LTO + ffast-math + SIMD (separate)
-```
+Für Multi-Channel-Verarbeitung (N Kanäle parallel): NEON (ARM) / SSE2 (x86)
+via Compiler Auto-Vectorization — erfordert struct-of-arrays statt
+array-of-structs für die Buffer. Scope: eigenes Feature-Ticket.
 
 ---
 
-## cmake Integration (Proposal)
+## Umsetzungsreihenfolge
+
+```
+1. Phase 1: C++20-Kompilierbarkeit (Blocker für alle weiteren Analysen)
+2. Phase 2.1: error()-Handler entkoppeln (RT-Grundvoraussetzung)
+3. Phase 2.2: const-Korrektheit vervollständigen
+4. Phase 3.1: Alloc-Phase / Run-Phase dokumentieren + inplace-API
+5. Phase 3.2: Cache-Layout konsolidieren
+6. Phase 3.3+3.4: Compiler-Hints + filter_step-Optimierung
+7. Phase 4: LTO + ffast-math + SIMD (separat)
+```
+
+---
+
+## cmake-Integration (Vorschlag)
 
 ```cmake
-# lib/CMakeLists.txt — extension:
+# lib/CMakeLists.txt — Erweiterung:
 
-option(FIDLIB_CXX20_COMPAT "Compile fidlib with C++20 compiler" OFF)
+option(FIDLIB_CXX20_COMPAT "fidlib mit C++20-Compiler übersetzen" OFF)
 
 if(FIDLIB_CXX20_COMPAT)
   set_source_files_properties(fidlib.c PROPERTIES LANGUAGE CXX)
   target_compile_options(fidlib PRIVATE -std=c++20 -Wno-old-style-cast)
 endif()
 
-option(FIDLIB_LTO "Link-Time Optimization for fidlib" OFF)
+option(FIDLIB_LTO "Link-Time Optimization für fidlib" OFF)
 if(FIDLIB_LTO)
   set_property(TARGET fidlib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
@@ -205,4 +209,4 @@ endif()
 
 ---
 
-*Created: 2026-05-27 — Base: fidlib JamesHight fork v0.9.11*
+*Erstellt: 2026-05-27 — Basis: fidlib JamesHight-Fork v0.9.11*

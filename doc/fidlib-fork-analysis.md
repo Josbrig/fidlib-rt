@@ -1,130 +1,128 @@
-# fidlib Fork Analysis — Which Base Do We Use?
+# fidlib Fork-Analyse — Welche Basis nehmen wir?
 
-Date: 2026-05-26  
-Context: Selecting the upstream base for the modernization project
+Datum: 2026-05-26  
+Kontext: Auswahl der Upstream-Basis für das Modernisierungsprojekt
 
 ---
 
-## Candidates at a Glance
+## Kandidaten im Überblick
 
-| Attribute | [uazu/fidlib] | [JamesHight/fidlib] |
+| Merkmal | [uazu/fidlib] | [JamesHight/fidlib] |
 |---|---|---|
-| Author / origin | Jim Peters (original author) | JamesHight as consolidator of multiple patches |
+| Autor / Ursprung | Jim Peters (Originalautor) | JamesHight als Sammler mehrerer Patches |
 | Commits | **2** | **18** |
-| Last activity | Aug 26, 2014 | Aug 29, 2014 |
-| Build system | Shell scripts (`mk-firun`, `mk-firun-mingw`) | **Autotools** (`configure.ac`, `Makefile.am`, `bootstrap.sh`) |
+| Letzte Aktivität | 26. Aug 2014 | 29. Aug 2014 |
+| Build-System | Shell-Skripte (`mk-firun`, `mk-firun-mingw`) | **Autotools** (`configure.ac`, `Makefile.am`, `bootstrap.sh`) |
 | Version | 0.9.10 | **0.9.11** |
-| C++ compatibility | no | **yes** (`extern "C"` guards) |
-| `const` correctness | no (`char *spec`) | **yes** (`const char *spec`) |
-| Compiler warnings | unclean | **cleaned up** |
-| pkg-config | no | **yes** (`fidlib.pc.in`) |
-| Stars (GitHub) | 5 | **11** |
-| Own forks | 6 | 2 |
-| Status per README | **unmaintained** | unmaintained (implicit) |
+| C++-Kompatibilität | nein | **ja** (`extern "C"` Guards) |
+| `const`-Korrektheit | nein (`char *spec`) | **ja** (`const char *spec`) |
+| Compiler-Warnungen | unbereinigt | **bereinigt** |
+| pkg-config | nein | **ja** (`fidlib.pc.in`) |
+| Sterne (GitHub) | 5 | **11** |
+| Eigene Forks | 6 | 2 |
+| Status laut README | **unmaintained** | unmaintained (implizit) |
 
 [uazu/fidlib]: https://github.com/uazu/fidlib
 [JamesHight/fidlib]: https://github.com/JamesHight/fidlib
 
 ---
 
-## What exactly is JamesHight/fidlib?
+## Was ist JamesHight/fidlib genau?
 
-It is **not a classic fork** of `uazu/fidlib` via the GitHub fork mechanism — the repo graph
-shows no direct lineage. JamesHight imported a copy of the original code in 2013 and then
-systematically merged patches from the community:
+Es ist **kein klassischer Fork** von `uazu/fidlib` über den GitHub-Fork-Mechanismus — der Repo-Graph zeigt keine direkte Abstammung. JamesHight hat 2013 eine Kopie des Originalcodes importiert und dann systematisch Patches aus der Community zusammengeführt:
 
-### Included Patches (commit reconstruction)
+### Enthaltene Patches (Commit-Rekonstruktion)
 
 ```
-2013-07  JamesHight    Lib import (original copy from uazu.net)
-2013-07  JamesHight    README corrections
+2013-07  JamesHight    Lib import (Originalkopie von uazu.net)
+2013-07  JamesHight    README-Korrekturen
 
-2014-08  daschuer      "Johns initial Mixxx commit" — Mixxx integration
+2014-08  daschuer      "Johns initial Mixxx commit" — Mixxx-Integration
 2014-08  daschuer      API: char *spec → const char *spec
-2014-08  daschuer      Replace #ifdef MIXXX with #ifdef __cplusplus
-2014-08  daschuer      Clean up discards-'const'-qualifier warnings
-2014-08  daschuer/     Windows/MinGW cross-compile fixes
+2014-08  daschuer      Ersetze #ifdef MIXXX durch #ifdef __cplusplus
+2014-08  daschuer      Bereinige discards-'const'-qualifier-Warnungen
+2014-08  daschuer/     Windows/MinGW-Cross-Compile-Fixes
          ulatekh
-2014-08  daschuer      Fixed -Wsign-compare warnings
-2014-08  daschuer      Fixed unused-parameter warnings
-2014-08  daschuer      Removed zero-size array
-2014-08  daschuer      Debug mode with extra warnings (mk_firun -d)
+2014-08  daschuer      -Wsign-compare-Warnungen behoben
+2014-08  daschuer      Unused-Parameter-Warnungen behoben
+2014-08  daschuer      Zero-size-Array entfernt
+2014-08  daschuer      Debug-Modus mit extra Warnungen (mk_firun -d)
 
-2014-08  kwhat         Autotools build system (configure.ac, Makefile.am)
-2014-08  kwhat         Bugfixes for packaging
-2014-08  kwhat         Fixed uninitialized-before-use warnings
+2014-08  kwhat         Autotools-Build-System (configure.ac, Makefile.am)
+2014-08  kwhat         Bugfixes für Packaging
+2014-08  kwhat         Unitialisiert-vor-Benutzung-Warnungen behoben
 ```
 
-**Core statement:** JamesHight/fidlib is the unofficial "community edition" of fidlib — it
-consolidates all practically tested patches that never flowed back into the original.
+**Kernaussage:** JamesHight/fidlib ist die inoffizielle "Community Edition" von fidlib — es sammelt
+alle praktisch erprobten Patches, die nie in das Original zurückgeflossen sind.
 
 ---
 
-## The Other Forks
+## Die anderen Forks
 
-All other forks (`daschuer/fidlib`, `gdkar/fidlib`, `EEGKit/fidlib`, `wjcroft/fidlib-1`) have
-exactly **2 commits** and are identical to the uazu original. None contain their own further
-development. `EEGKit/fidlib` even contains an explicit note:
+Alle übrigen Forks (`daschuer/fidlib`, `gdkar/fidlib`, `EEGKit/fidlib`, `wjcroft/fidlib-1`) haben
+genau **2 Commits** und sind identisch mit dem uazu-Original. Keiner enthält eigene Weiterentwicklungen.
+`EEGKit/fidlib` enthält sogar explizit den Hinweis:
 
 > *CURRENTLY UNMAINTAINED — Consider daschuer/mixxxdj fork if this doesn't work for you.*
 
-The `daschuer/mixxxdj` branch recommended in uazu/fidlib is exactly the set of patches that
-is already consolidated via JamesHight/fidlib.
+Der in uazu/fidlib empfohlene `daschuer/mixxxdj`-Branch ist genau der Satz Patches, der via
+JamesHight/fidlib bereits konsolidiert vorliegt.
 
 ---
 
-## API Difference: The Decisive Break
+## API-Unterschied: der entscheidende Bruch
 
-The most important substantive difference between the two candidates is const correctness:
+Der wichtigste inhaltliche Unterschied zwischen den beiden Kandidaten ist die const-Korrektheit:
 
 ```c
 // uazu/fidlib — original
 FidFilter *fid_design(char *spec, ...);
 void fid_rewrite_spec(char *spec, ...);
 
-// JamesHight/fidlib — patched version
+// JamesHight/fidlib — gepatchte Version
 FidFilter *fid_design(const char *spec, ...);
 void fid_rewrite_spec(const char *spec, ...);
 ```
 
-Anyone passing filter specifications from string literals (the most common use case)
-gets a compiler error in C++ and a warning in C with the original. The JamesHight version
-is API-compatible but const-correct — no breaking change for existing users.
+Wer Filterspezifikationen aus String-Literalen übergibt (der häufigste Anwendungsfall),
+erhält mit dem Original einen Compiler-Fehler in C++ und eine Warnung in C. Die JamesHight-Version
+ist hier API-kompatibel aber const-korrekt — kein Breaking Change für bestehende Nutzer.
 
 ---
 
-## Recommendation
+## Empfehlung
 
-**We build on [JamesHight/fidlib].**
+**Wir bauen auf [JamesHight/fidlib] auf.**
 
-Rationale:
+Begründung:
 
-1. **Consolidates the best available patches** from multiple independent sources
-   (Mixxx team, kwhat, ulatekh) — everything that was missing from the original is already collected.
+1. **Konsolidiert die besten verfügbaren Patches** aus mehreren unabhängigen Quellen
+   (Mixxx-Team, kwhat, ulatekh) — alles, was am Original fehlte, ist bereits gesammelt.
 
-2. **Autotools base** makes the step to CMake or Meson trivial — there is already a
-   clean `configure.ac` with versioning, `pkg-config` support and options.
+2. **Autotools-Basis** macht den Schritt zu CMake oder Meson trivial — es gibt bereits eine
+   saubere `configure.ac` mit Versionierung, `pkg-config`-Support und Optionen.
 
-3. **const correctness** is a prerequisite for clean C++17/C99 and would otherwise
-   need to be added first.
+3. **const-Korrektheit** ist eine Voraussetzung für sauberes C++17/C99 und muss sonst
+   als erstes nachgebessert werden.
 
-4. **C++ guards** are present — the library can already be embedded in C++ projects today
-   without name mangling problems.
+4. **C++-Guards** sind vorhanden — die Library kann schon heute in C++-Projekten ohne
+   Name-Mangling-Probleme eingebunden werden.
 
-5. Version **0.9.11** vs 0.9.10 shows that the patches were regarded as a patch release,
-   not a fork.
+5. Version **0.9.11** gegenüber 0.9.10 zeigt, dass die Patches inhaltlich als Patch-Release
+   betrachtet wurden, nicht als Abspaltung.
 
-The uazu/fidlib repo serves as a **reference for the mathematical core** — in particular
-`fidmkf.h` (mkfilter algorithms) — but not as the working base.
+Das uazu/fidlib-Repo dient als **Referenz für den mathematischen Kern** — insbesondere
+`fidmkf.h` (mkfilter-Algorithmen) — aber nicht als Arbeitsbasis.
 
 ---
 
-## Recommended Next Steps
+## Empfohlene nächste Schritte
 
-1. Take `JamesHight/fidlib` as a Git subtree or direct import into `vendor/fidlib/`.
-2. Migrate the build system from Autotools to **CMake** (or Meson) — `configure.ac` as
-   template for all dependencies and feature flags.
-3. Clean up `fidlib.h` / `fidlib.c` for **C99** (VLAs, `//` comments already OK,
-   wrap `__attribute__` portably).
-4. Write first smoke test: Butterworth LP 4th order, impulse response against reference values
-   from fiview.
+1. `JamesHight/fidlib` als Git-Subtree oder direkten Import in `vendor/fidlib/` übernehmen.
+2. Build-System von Autotools auf **CMake** (oder Meson) migrieren — `configure.ac` als
+   Vorlage für alle Abhängigkeiten und Feature-Flags.
+3. `fidlib.h` / `fidlib.c` auf **C99** bereinigen (VLAs, `//`-Kommentare bereits ok,
+   `__attribute__` portabel wrappen).
+4. Ersten Smoke-Test schreiben: Butterworth LP 4. Ordnung, Impulsantwort gegen Referenzwerte
+   aus fiview prüfen.

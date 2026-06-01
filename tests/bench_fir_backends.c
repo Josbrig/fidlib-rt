@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2025-2026 Kai Dieki
+// Copyright (C) 2025-2026 Jörg Simbrig
 /*
  * bench_fir_backends.c — FIR backend throughput benchmark
  *

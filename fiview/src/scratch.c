@@ -103,9 +103,10 @@ scr_wrap(int wid, const char *ind) {
 
 void
 scr_vpr(const char *fmt, va_list ap) {
-   if (!fmt) return;
    while (1) {
-      int cnt= vsnprintf(scratch+scr_len, (size_t)(scr_max-scr_len), fmt, ap);
+      int avail= scr_max - scr_len;
+      if (avail <= 1) { scr_realloc(); continue; }
+      int cnt= vsnprintf(scratch+scr_len, (size_t)avail, fmt, ap);
       if (cnt < 0 || cnt + scr_len >= scr_max -1) {
 	 scr_realloc();
 	 continue;

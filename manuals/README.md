@@ -1,14 +1,14 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
 # Manuals
 
 ## Installation
 
-Platform-specific installation guides: what the install scripts do and
-how to perform each step manually.
+Plattformspezifische Installationsanleitungen: was die Install-Scripts tun und
+wie man es manuell Schritt für Schritt durchführt.
 
-| Platform | Manual |
+| Plattform | Manual |
 |-----------|--------|
 | Raspberry Pi 5 (BCM2712, VideoCore VII, Vulkan 1.2) | [installation/raspi5.md](installation/raspi5.md) |
 | Raspberry Pi 4 (BCM2711, VideoCore VI) | [installation/raspi4.md](installation/raspi4.md) |
@@ -16,16 +16,16 @@ how to perform each step manually.
 | Desktop Linux x86_64 (Ubuntu/Debian, NVIDIA/AMD/Intel) | [installation/desktop-x86.md](installation/desktop-x86.md) |
 | NVIDIA Jetson (JetPack 5/6, AArch64) | [installation/jetson.md](installation/jetson.md) |
 
-## Solutions
+## Lösungen
 
-Representative problems with step-by-step instructions for how to solve them
-using the tools provided by this project.
+Exemplarische Probleme mit Schritt-für-Schritt-Anleitung wie sie mit
+den Mitteln dieses Projekts gelöst werden.
 
 | Problem | Manual |
 |---------|--------|
-| Low-pass noise suppression in audio signals | [loesungen/tiefpass-rauschunterdrueckung.md](loesungen/tiefpass-rauschunterdrueckung.md) |
-| Bandpass filtering for bio- and measurement signals (EEG) | [loesungen/bandpass-biosignale.md](loesungen/bandpass-biosignale.md) |
-| Real-time filtering in your own C program (C API) | [loesungen/echtzeit-c-api.md](loesungen/echtzeit-c-api.md) |
-| Long FIR filters efficiently with overlap-save FFT | [loesungen/fir-fft-beschleunigung.md](loesungen/fir-fft-beschleunigung.md) |
-| GPU-accelerated FIR filtering via Vulkan (RPi 5) | [loesungen/gpu-vulkan-rpi5.md](loesungen/gpu-vulkan-rpi5.md) |
-| Signal processing in the shell with firun | [loesungen/kommandozeilen-pipeline-firun.md](loesungen/kommandozeilen-pipeline-firun.md) |
+| Tiefpass-Rauschunterdrückung in Audiosignalen | [loesungen/tiefpass-rauschunterdrueckung.md](loesungen/tiefpass-rauschunterdrueckung.md) |
+| Bandpassfilterung für Bio- und Messsignale (EEG) | [loesungen/bandpass-biosignale.md](loesungen/bandpass-biosignale.md) |
+| Echtzeit-Filterung im eigenen C-Programm (C-API) | [loesungen/echtzeit-c-api.md](loesungen/echtzeit-c-api.md) |
+| Lange FIR-Filter effizient mit Overlap-Save FFT | [loesungen/fir-fft-beschleunigung.md](loesungen/fir-fft-beschleunigung.md) |
+| GPU-beschleunigte FIR-Filterung via Vulkan (RPi 5) | [loesungen/gpu-vulkan-rpi5.md](loesungen/gpu-vulkan-rpi5.md) |
+| Signalverarbeitung in der Shell mit firun | [loesungen/kommandozeilen-pipeline-firun.md](loesungen/kommandozeilen-pipeline-firun.md) |

@@ -1,34 +1,34 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (C) 2025-2026 Kai Dieki -->
+<!-- Copyright (C) 2025-2026 Jörg Simbrig -->
 
-# Solution: Low-Pass Noise Suppression in Audio Signals
+# Lösung: Tiefpass-Rauschunterdrückung in Audiosignalen
 
-## The Problem
+## Das Problem
 
-An audio signal (sample rate 44100 Hz) contains high-frequency noise above
-4000 Hz — typical with switching noise, HF interference, or cheap A/D converters.
-The noise should be removed without affecting the useful signal (< 3500 Hz).
+Ein Audiosignal (Sample-Rate 44100 Hz) enthält hochfrequentes Rauschen oberhalb
+von 4000 Hz — typisch bei Schaltgeräuschen, HF-Interferenz oder billigen A/D-Wandlern.
+Das Rauschen soll entfernt werden, ohne das Nutzsignal (< 3500 Hz) zu beeinflussen.
 
-**Requirements:**
+**Anforderungen:**
 - Cutoff: 4000 Hz
-- Sufficient stopband attenuation in the noise band (> 3 dB at 4 kHz, > 20 dB at 8 kHz)
-- Causal filter (real-time capable, no look-ahead)
-- Minimal effort: no recompilation when the cutoff changes
+- Ausreichende Sperrdämpfung im Rauschband (> 3 dB bei 4 kHz, > 20 dB bei 8 kHz)
+- Kausaler Filter (Echtzeit-fähig, kein Look-ahead)
+- Minimalaufwand: kein Recompile wenn sich Cutoff ändert
 
 ---
 
-## Which project tools help
+## Welche Mittel des Projekts helfen
 
-- **fidlib** — designs and runs the filter from a runtime specification
-- **firun** — applies the filter to raw data on the command line
-- **`LpBu4/4000`** — Butterworth lowpass 4th order, cutoff 4000 Hz
-- **`FIDLIB_SIMD=ON`** — NEON/SSE2 acceleration for real-time operation
+- **fidlib** — entwirft und führt den Filter per Laufzeit-Spezifikation aus
+- **firun** — wendet den Filter auf der Kommandozeile auf Rohdaten an
+- **`LpBu4/4000`** — Butterworth-Tiefpass 4. Ordnung, Cutoff 4000 Hz
+- **`FIDLIB_SIMD=ON`** — NEON/SSE2-Beschleunigung für Echtzeit-Betrieb
 
 ---
 
-## Step by Step — Variant A: Command line with firun
+## Schritt-für-Schritt — Variante A: Kommandozeile mit firun
 
-### Step 1: Build the project (if not already done)
+### Schritt 1: Projekt bauen (falls noch nicht geschehen)
 
 ```bash
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
@@ -38,102 +38,102 @@ cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
 cmake --build build -j$(nproc)
 ```
 
-This produces `build/bin/firun`.
+Das erzeugt `build/bin/firun`.
 
-### Step 2: Understand the filter specification
+### Schritt 2: Filter-Spezifikation verstehen
 
 ```
 LpBu4/4000
-│  │ │  └── Cutoff frequency: 4000 Hz
-│  │ └──── Order: 4 (two chained biquads = 4 poles)
-│  └──── Bu = Butterworth (maximally flat passband)
-└──── Lp = Lowpass
+│  │ │  └── Cutoff-Frequenz: 4000 Hz
+│  │ └──── Ordnung: 4 (zwei verkettete Biquads = 4 Pole)
+│  └──── Bu = Butterworth (maximal flacher Durchlassbereich)
+└──── Lp = Lowpass (Tiefpass)
 ```
 
-Butterworth 4th order at 44100 Hz: -3 dB at 4000 Hz, -80 dB at ~16 kHz.
+Butterworth 4. Ordnung bei 44100 Hz: -3 dB bei 4000 Hz, -80 dB bei ~16 kHz.
 
-### Step 3: Test the impulse response (without real audio data)
+### Schritt 3: Impulse-Antwort testen (ohne echte Audiodaten)
 
 ```bash
 build/bin/firun -d 100 44100 %I LpBu4/4000
 ```
 
-- `%I` — synthetic impulse as input (1, 0, 0, 0, ...)
-- `-d 100` — output 100 samples
-- Output is ASCII, one value per line
+- `%I` — synthetischer Impuls als Eingang (1, 0, 0, 0, ...)
+- `-d 100` — 100 Samples ausgeben
+- Ausgabe ist ASCII, ein Wert pro Zeile
 
-Expected: first value ≈ 0.0003 (filter gain), then ringing impulse response,
-decaying to 0.
+Erwartung: erster Wert ≈ 0.0003 (Filter-Gain), dann klingende Impulsantwort,
+abklingend auf 0.
 
-### Step 4: Filter raw 16-bit audio data
+### Schritt 4: Rohe 16-Bit-Audio-Daten filtern
 
 ```bash
-# Signed 16-bit PCM (little-endian), 1 channel, 44100 Hz:
+# Signed 16-Bit PCM (Little-Endian), 1 Kanal, 44100 Hz:
 cat eingabe.raw | build/bin/firun 44100 s LpBu4/4000 > ausgabe.raw
 ```
 
-### Step 5: Using sox as pre/post processor
+### Schritt 5: Mit sox als Pre-/Post-Prozessor
 
 ```bash
-# WAV → raw PCM → filter → raw PCM → WAV:
+# WAV → Raw PCM → Filter → Raw PCM → WAV:
 sox eingabe.wav -t raw -e signed -b 16 -r 44100 - | \
     build/bin/firun 44100 s LpBu4/4000 | \
     sox -t raw -e signed -b 16 -r 44100 -c 1 - ausgabe.wav
 ```
 
-### Step 6: Stereo signal (2 channels, interleaved)
+### Schritt 6: Stereo-Signal (2 Kanäle, interleaved)
 
-With stereo each frame contains alternating L+R. firun filters each channel
-with its own filter instance:
+Bei Stereo enthält jeder Frame L+R abwechselnd. firun filtert jeden Kanal
+mit einer eigenen Filter-Instanz:
 
 ```bash
-# Two identical filter specs → L and R are each filtered with LpBu4/4000:
+# Zwei identische Filter-Specs → L und R werden je mit LpBu4/4000 gefiltert:
 cat stereo.raw | build/bin/firun 44100 s2 LpBu4/4000 LpBu4/4000 > gefiltert.raw
 ```
 
-The format `s2` means: 2 signed 16-bit values per frame (L, R).
+Das Format `s2` bedeutet: 2 Signed-16-Bit-Werte pro Frame (L, R).
 
 ---
 
-## Step by Step — Variant B: C API in your own program
+## Schritt-für-Schritt — Variante B: C-API im eigenen Programm
 
-### Step 1: Alloc phase (once, before the RT loop)
+### Schritt 1: Alloc-Phase (einmalig, vor der RT-Schleife)
 
 ```c
 #include <fidlib/fidlib.h>
 #include <stdlib.h>
 
-// Design filter: Butterworth LP 4th order, cutoff 4000 Hz, rate 44100 Hz
+// Filter entwerfen: Butterworth LP 4. Ordnung, Cutoff 4000 Hz, Rate 44100 Hz
 FidFilter *filt = fid_design("LpBu4/4000", 44100.0, -1.0, -1.0, 0, NULL);
 
-// Create run object (selects best backend: NEON/FFT/Vulkan)
+// Run-Objekt erzeugen (wählt bestes Backend: NEON/FFT/Vulkan)
 FidFunc *step_fn;
 void    *run = fid_run_new(filt, &step_fn);
 
-// Filter state buffer (one per channel/instance)
+// Filter-Zustandspuffer (einen pro Kanal/Instanz)
 void *buf = fid_run_newbuf(run);
 
-free(filt);   // FidFilter no longer needed — coefficients are in run
+free(filt);   // FidFilter nicht mehr nötig — Koeffizienten sind in run
 ```
 
-### Step 2: Run phase (RT-safe, no malloc)
+### Schritt 2: Run-Phase (RT-sicher, kein malloc)
 
 ```c
-// For each incoming sample:
+// Für jeden eingehenden Sample:
 double output = step_fn(buf, input_sample);
 ```
 
-`step_fn` is a direct function pointer — no virtual dispatch,
-no heap. Safe in audio callbacks (JACK, ALSA, PortAudio).
+`step_fn` ist ein direkter Funktionszeiger — kein virtueller Dispatch,
+kein Heap. Sicher in Audio-Callbacks (JACK, ALSA, PortAudio).
 
-### Step 3: Free phase (on shutdown)
+### Schritt 3: Free-Phase (beim Beenden)
 
 ```c
 fid_run_freebuf(buf);
 fid_run_free(run);
 ```
 
-### Complete minimal example
+### Vollständiges Mini-Beispiel
 
 ```c
 #include <fidlib/fidlib.h>
@@ -147,7 +147,7 @@ int main(void) {
     void      *buf = fid_run_newbuf(run);
     free(filt);
 
-    // Process impulse and output first 20 samples
+    // Impuls verarbeiten und erste 20 Samples ausgeben
     printf("%.8f\n", fn(buf, 1.0));
     for (int i = 0; i < 19; i++)
         printf("%.8f\n", fn(buf, 0.0));
@@ -158,7 +158,7 @@ int main(void) {
 }
 ```
 
-Compile:
+Kompilieren:
 ```bash
 gcc -o lp_test lp_test.c \
     -I build/fidlib -L build/fidlib -lfidlib -lm \
@@ -167,25 +167,25 @@ gcc -o lp_test lp_test.c \
 
 ---
 
-## Filter variants for similar requirements
+## Filter-Varianten für ähnliche Anforderungen
 
-| Requirement | Fispec | Comment |
+| Anforderung | Fispec | Kommentar |
 |---|---|---|
-| Softer transition | `LpBu6/4000` | Order 6, steeper rolloff |
-| Phase error not important | `LpBe4/4000` | Bessel: linear phase response |
-| Maximum stopband attenuation | `LpCh4/-1/4000` | Chebyshev: 1 dB ripple, steep rolloff |
-| Higher cutoff | `LpBu4/8000` | Cutoff 8 kHz at 44100 Hz |
-| Low sample rate (e.g. 8000 Hz) | `LpBu4/800` | Cutoff = 10% of Nyquist frequency |
+| Weicherer Übergang | `LpBu6/4000` | Ordnung 6, steilere Flanke |
+| Kein Phasenfehler wichtig | `LpBe4/4000` | Bessel: linearer Phasengang |
+| Maximale Sperrdämpfung | `LpCh4/-1/4000` | Chebyshev: 1 dB Ripple, steile Flanke |
+| Höhere Cutoff | `LpBu4/8000` | Cutoff 8 kHz bei 44100 Hz |
+| Niedrige Sample-Rate (z.B. 8000 Hz) | `LpBu4/800` | Cutoff = 10% der Nyquist-Frequenz |
 
 ---
 
-## Verification
+## Verifikation
 
 ```bash
-# Output step response and check last value (→ must approach 1.0):
+# Stufenantwortt ausgeben und letzten Wert prüfen (→ muss → 1.0 gehen):
 build/bin/firun -d 200 44100 %S LpBu4/4000 | tail -5
 
-# Plot impulse response (with gnuplot):
+# Impulsantwort plotten (mit gnuplot):
 build/bin/firun -d 300 44100 %I LpBu4/4000 > impulse.dat
 gnuplot -e "plot 'impulse.dat' with lines title 'LpBu4 @ 44100 Hz'; pause -1"
 ```

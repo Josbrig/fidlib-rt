@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2025-2026 Kai Dieki
+// Copyright (C) 2025-2026 Jörg Simbrig
 /*
  * test_fidlib_fft.c — Overlap-Save FFT convolution engine correctness test
  *

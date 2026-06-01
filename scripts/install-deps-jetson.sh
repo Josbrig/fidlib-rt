@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2025-2026 Kai Dieki
-# install-deps-jetson.sh — Dependencies for NVIDIA Jetson (JetPack)
+# install-deps-jetson.sh — Abhängigkeiten für NVIDIA Jetson (JetPack)
 #
-# Target platform:  NVIDIA Jetson Nano / Xavier NX / Orin NX / AGX Orin
-#                   Ubuntu 20.04 / 22.04 (aarch64), JetPack 5.x / 6.x
+# Zielplattform:  NVIDIA Jetson Nano / Xavier NX / Orin NX / AGX Orin
+#                 Ubuntu 20.04 / 22.04 (aarch64), JetPack 5.x / 6.x
 #
-# GPU capabilities: NVIDIA GPU + CUDA
-#   Vulkan:  fully supported via NVIDIA proprietary driver (JetPack 5+)
+# GPU-Fähigkeiten: NVIDIA GPU + CUDA
+#   Vulkan:  vollständig via NVIDIA proprietary driver (JetPack 5+)
 #   OpenCL:  via CUDA OpenCL ICD (libcuda.so + nvidia-opencl-icd)
-#   CUDA:    not directly used by this project, but installed alongside
+#   CUDA:    nicht direkt von diesem Projekt genutzt, aber mitinstalliert
 #
-# Enabled features after installation:
-#   FIDLIB_SIMD=ON      NEON (AArch64, always available)
+# Aktivierte Features nach Installation:
+#   FIDLIB_SIMD=ON      NEON (AArch64, immer verfügbar)
 #   FIDLIB_FFT=ON       Overlap-Save + FFTW3
 #   FIDLIB_VULKAN=ON    Vulkan 1.x Compute via NVIDIA driver
-#   FIDLIB_OPENCL=ON    OpenCL via CUDA ICD (NVIDIA GPU as compute device)
+#   FIDLIB_OPENCL=ON    OpenCL via CUDA ICD (NVIDIA GPU als Compute-Device)
 #
-# Prerequisite: JetPack 5.x or 6.x must already be installed.
-#   Check: dpkg -l | grep -i jetpack
-#   JetPack ships CUDA, cuDNN, libvulkan, libOpenCL already.
+# Voraussetzung: JetPack 5.x oder 6.x muss bereits installiert sein.
+#   Prüfen: dpkg -l | grep -i jetpack
+#   JetPack bringt CUDA, cuDNN, libvulkan, libOpenCL bereits mit.
 #
-# Usage: bash scripts/install-deps-jetson.sh [--no-gpu]
+# Aufruf: bash scripts/install-deps-jetson.sh [--no-gpu]
 
 set -euo pipefail
 
@@ -32,87 +32,87 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 sect()  { echo -e "\n${CYAN}${BOLD}── $* ──${NC}"; }
 
-# ── Arguments ─────────────────────────────────────────────────────────────────
+# ── Argumente ────────────────────────────────────────────────────────────────
 WITH_GPU=1
 for arg in "$@"; do
     case "$arg" in
         --no-gpu) WITH_GPU=0 ;;
-        *) error "Unknown argument: $arg"; echo "Usage: $0 [--no-gpu]"; exit 1 ;;
+        *) error "Unbekanntes Argument: $arg"; echo "Aufruf: $0 [--no-gpu]"; exit 1 ;;
     esac
 done
 
-# ── Platform check ───────────────────────────────────────────────────────────
+# ── Plattform-Prüfung ────────────────────────────────────────────────────────
 ARCH=$(uname -m)
 if [[ "$ARCH" != "aarch64" ]]; then
-    warn "This script is for aarch64 (Jetson) — current architecture: $ARCH"
-    warn "Continue anyway?"
-    read -rp "[y/N] " C; [[ "${C,,}" == "y" ]] || exit 1
+    warn "Dieses Skript ist für aarch64 (Jetson) — aktuelle Architektur: $ARCH"
+    warn "Trotzdem fortfahren?"
+    read -rp "[j/N] " C; [[ "${C,,}" == "j" ]] || exit 1
 fi
 
-# Check for Tegra SoC
+# Tegra-SoC prüfen
 if ! grep -qi "tegra\|jetson\|nvidia" /proc/cpuinfo 2>/dev/null &&
    ! grep -qi "tegra\|jetson"         /proc/device-tree/model 2>/dev/null; then
-    warn "No Tegra/Jetson SoC detected."
+    warn "Kein Tegra/Jetson-SoC erkannt."
 fi
 
-# Display JetPack version (if present)
+# JetPack-Version anzeigen (falls vorhanden)
 if dpkg -l nvidia-jetpack 2>/dev/null | grep -q "^ii"; then
     JP_VER=$(dpkg -l nvidia-jetpack 2>/dev/null | awk '/nvidia-jetpack/{print $3}' | head -1)
-    info "JetPack detected: $JP_VER"
+    info "JetPack erkannt: $JP_VER"
 else
-    warn "nvidia-jetpack package not found — is JetPack correctly installed?"
-    warn "  Check: dpkg -l | grep -i jetpack"
+    warn "nvidia-jetpack-Paket nicht gefunden — ist JetPack korrekt installiert?"
+    warn "  Prüfen: dpkg -l | grep -i jetpack"
 fi
 
-# ── Check aptitude ───────────────────────────────────────────────────────────
-# Jetson/Ubuntu: apt or aptitude
+# ── aptitude prüfen ──────────────────────────────────────────────────────────
+# Jetson/Ubuntu: apt oder aptitude
 if command -v aptitude &>/dev/null; then
     PKG_MGR_CMD="aptitude"
     SIM_FLAG="--simulate"
 else
-    warn "aptitude not found — falling back to apt-get."
-    warn "  For more consistent dependency handling: sudo apt-get install aptitude"
+    warn "aptitude nicht gefunden — verwende apt-get als Fallback."
+    warn "  Für konsistenteres Dependency-Handling: sudo apt-get install aptitude"
     PKG_MGR_CMD="apt-get"
     SIM_FLAG="--dry-run"
 fi
 [[ $EUID -ne 0 ]] && SUDO=sudo || SUDO=
 
-# ── Packages ─────────────────────────────────────────────────────────────────
-sect "Package list"
+# ── Pakete ───────────────────────────────────────────────────────────────────
+sect "Paketliste"
 
 BUILD=(
     build-essential     # gcc, g++, make
-    cmake               # >= 3.16 required
+    cmake               # >= 3.16 erforderlich
     git
     pkg-config
 )
 
-SDL2=(                  # SDL2 source build (ExternalProject_Add)
+SDL2=(                  # SDL2-Quell-Build (ExternalProject_Add)
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev
     libxi-dev libxinerama-dev libxxf86vm-dev
     libgl1-mesa-dev libasound2-dev libpulse-dev
 )
 
 FFT=(
-    libfftw3-dev        # Overlap-Save FFTW3 backend
+    libfftw3-dev        # Overlap-Save FFTW3-Backend
 )
 
-# Vulkan headers and shader compiler
-# libvulkan1 and libvulkan-dev are provided by JetPack.
-# If JetPack is not installed: fall back to libvulkan-dev from Ubuntu repo.
+# Vulkan-Header und Shader-Compiler
+# libvulkan1 und libvulkan-dev werden von JetPack bereitgestellt.
+# Wenn JetPack nicht installiert: Fallback auf libvulkan-dev aus Ubuntu-Repo.
 VULKAN_TOOLS=(
-    glslang-tools       # glslangValidator: GLSL → SPIR-V for fir_dot.comp
-    spirv-tools         # spirv-dis / spirv-val (diagnostics)
+    glslang-tools       # glslangValidator: GLSL → SPIR-V für fir_dot.comp
+    spirv-tools         # spirv-dis / spirv-val (Diagnose)
     vulkan-tools        # vulkaninfo
 )
 
-# OpenCL headers + ICD loader
-# The CUDA package ships libOpenCL.so — only headers + ICD loader dev needed here.
+# OpenCL-Headers + ICD-Loader
+# Das CUDA-Paket bringt libOpenCL.so mit — hier nur Headers + ICD-Loader-Dev.
 OPENCL_HEADERS=(
-    opencl-headers      # for #include <CL/opencl.h>
-    ocl-icd-opencl-dev  # ICD loader + libOpenCL.so (if not provided by CUDA)
-    ocl-icd-libopencl1  # ICD loader runtime
-    clinfo              # OpenCL diagnostics
+    opencl-headers      # für #include <CL/opencl.h>
+    ocl-icd-opencl-dev  # ICD-Loader + libOpenCL.so (falls nicht durch CUDA bereitgestellt)
+    ocl-icd-libopencl1  # ICD-Loader Runtime
+    clinfo              # OpenCL-Diagnose
 )
 
 DOC=(
@@ -129,59 +129,59 @@ else
     ALL=( "${BASE_PACKAGES[@]}" )
 fi
 
-sect "Base packages"
+sect "Basis-Pakete"
 printf '  %s\n' "${BASE_PACKAGES[@]}"
 
 if [[ $WITH_GPU -eq 1 ]]; then
     echo
-    sect "GPU packages (Vulkan tools + OpenCL headers)"
+    sect "GPU-Pakete (Vulkan-Tools + OpenCL-Headers)"
     printf '  %s\n' "${GPU_PACKAGES[@]}"
     echo
-    info "Note: JetPack installs Vulkan driver + CUDA-OpenCL automatically."
-    info "  libvulkan1, libvulkan-dev and libOpenCL.so come from the CUDA/JetPack stack."
-    info "  Only shader compiler tools and OpenCL dev headers are added here."
+    info "Hinweis: JetPack installiert Vulkan-Treiber + CUDA-OpenCL automatisch."
+    info "  libvulkan1, libvulkan-dev und libOpenCL.so kommen aus dem CUDA/JetPack-Stack."
+    info "  Hier werden nur Shader-Compiler-Tools und OpenCL-Dev-Headers ergänzt."
 fi
 echo
 
-# ── Check Vulkan library separately ──────────────────────────────────────────
+# ── Vulkan-Bibliothek separat prüfen ─────────────────────────────────────────
 if [[ $WITH_GPU -eq 1 ]]; then
     if ! dpkg -l libvulkan1 2>/dev/null | grep -q "^ii"; then
-        warn "libvulkan1 not found — installing separately:"
+        warn "libvulkan1 nicht gefunden — wird separat nachinstalliert:"
         $SUDO $PKG_MGR_CMD install -y libvulkan-dev libvulkan1 || true
     fi
 fi
 
-# ── Simulate + confirmation ───────────────────────────────────────────────────
+# ── Simulate + Bestätigung ───────────────────────────────────────────────────
 sect "Simulation"
 $SUDO $PKG_MGR_CMD install $SIM_FLAG -y "${ALL[@]}"
 echo
-read -rp "Proceed with installation? [y/N] " CONFIRM
-[[ "${CONFIRM,,}" == "y" ]] || { warn "Aborted."; exit 0; }
+read -rp "Installation durchführen? [j/N] " CONFIRM
+[[ "${CONFIRM,,}" == "j" ]] || { warn "Abgebrochen."; exit 0; }
 
-# ── Install ───────────────────────────────────────────────────────────────────
+# ── Installieren ─────────────────────────────────────────────────────────────
 sect "Installation"
 $SUDO $PKG_MGR_CMD install -y "${ALL[@]}"
 
-# ── Versions ──────────────────────────────────────────────────────────────────
-sect "Installed versions"
+# ── Versionen ────────────────────────────────────────────────────────────────
+sect "Installierte Versionen"
 cmake --version               | head -1
 gcc   --version               | head -1
 pkg-config --modversion fftw3 2>/dev/null | sed 's/^/fftw3: /' || true
 
 if [[ $WITH_GPU -eq 1 ]]; then
     echo
-    info "GPU toolchain:"
-    nvcc --version 2>/dev/null | grep "release" || warn "CUDA nvcc not found"
-    glslangValidator --version 2>/dev/null | head -1 || warn "glslangValidator not found"
+    info "GPU-Toolchain:"
+    nvcc --version 2>/dev/null | grep "release" || warn "CUDA nvcc nicht gefunden"
+    glslangValidator --version 2>/dev/null | head -1 || warn "glslangValidator nicht gefunden"
     vulkaninfo --summary 2>/dev/null \
         | grep -E "deviceName|apiVersion" | head -4 || true
     clinfo --list 2>/dev/null | head -8 || true
 fi
 
-# ── cmake configuration ───────────────────────────────────────────────────────
-sect "Recommended cmake configuration"
+# ── cmake-Konfiguration ──────────────────────────────────────────────────────
+sect "Empfohlene cmake-Konfiguration"
 cat <<'EOF'
-  # Full Jetson build (NEON + FFT + Vulkan + OpenCL):
+  # Vollständiger Jetson-Build (NEON + FFT + Vulkan + OpenCL):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON \
         -DFIDLIB_FFT=ON \
@@ -199,7 +199,7 @@ cat <<'EOF'
   cmake --build build_bench --target bench_fir_backends -j$(nproc)
   ./build_bench/bin/bench_fir_backends
 
-  # NEON + FFT only (without GPU, if JetPack GPU stack is missing):
+  # Nur NEON + FFT (ohne GPU, falls JetPack-GPU-Stack fehlt):
   cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
         -DFIDLIB_SIMD=ON -DFIDLIB_FFT=ON \
         -S . -B build_jetson_cpu
